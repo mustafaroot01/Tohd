@@ -43,10 +43,10 @@ onMounted(() => {
     <div class="d-flex justify-space-between align-center flex-wrap gap-4 mb-6">
       <div>
         <h2 class="text-h4 font-weight-bold">
-          المستخدمون والمشتركون 👥
+          مستخدمو النظام 🛡️
         </h2>
         <p class="text-muted mb-0">
-          استعراض الحسابات المسجلة، حالة الاشتراك، وبيانات المناهج المفعلة
+          استعراض حسابات مدراء لوحة التحكم الذين يديرون المنصة
         </p>
       </div>
     </div>
@@ -59,7 +59,6 @@ onMounted(() => {
             <tr>
               <th class="text-start">المستخدم</th>
               <th class="text-start">البريد الإلكتروني</th>
-              <th class="text-start">الصلاحية (الدور)</th>
               <th class="text-start">حالة الحساب</th>
               <th class="text-start">تاريخ التسجيل</th>
               <th class="text-center">التفاصيل</th>
@@ -78,15 +77,6 @@ onMounted(() => {
                 </div>
               </td>
               <td>{{ user.email }}</td>
-              <td>
-                <VChip
-                  size="small"
-                  :color="user.role === 'ADMIN' ? 'error' : 'primary'"
-                  variant="tonal"
-                >
-                  {{ user.role === 'ADMIN' ? 'مدير نظام' : 'مستخدم تطبيق' }}
-                </VChip>
-              </td>
               <td>
                 <VChip
                   size="small"
@@ -115,8 +105,8 @@ onMounted(() => {
             </tr>
 
             <tr v-if="users.length === 0 && !isLoading">
-              <td colspan="6" class="text-center py-8 text-muted">
-                لا يوجد مستخدمون مسجلون بعد.
+              <td colspan="5" class="text-center py-8 text-muted">
+                لا يوجد مستخدمو نظام مسجلون بعد.
               </td>
             </tr>
           </tbody>
@@ -127,7 +117,7 @@ onMounted(() => {
     <!-- User Details Dialog -->
     <VDialog v-model="isDetailsDialogVisible" max-width="500">
       <VCard v-if="selectedUser">
-        <VCardTitle class="pa-4 font-weight-bold">بيانات المشترك</VCardTitle>
+        <VCardTitle class="pa-4 font-weight-bold">بيانات المستخدم</VCardTitle>
         <VDivider />
         <VCardText class="pa-4">
           <div class="d-flex align-center gap-3 mb-4">
@@ -143,10 +133,6 @@ onMounted(() => {
           <VDivider class="mb-4" />
 
           <div class="bg-background pa-3 rounded text-caption mb-3">
-            <div class="d-flex justify-space-between mb-2">
-              <span class="text-muted">نوع الحساب:</span>
-              <span class="font-weight-bold">{{ selectedUser.role }}</span>
-            </div>
             <div class="d-flex justify-space-between mb-2">
               <span class="text-muted">الحالة:</span>
               <span>{{ selectedUser.status }}</span>

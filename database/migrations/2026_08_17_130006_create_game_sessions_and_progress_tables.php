@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignUuid('user_id')->constrained('users')->cascadeOnDelete();
             $table->foreignUuid('game_id')->constrained('games')->cascadeOnDelete();
             $table->foreignUuid('curriculum_day_id')->nullable()->constrained('curriculum_days')->nullOnDelete();
-            $table->timestamp('started_at')->index();
+            $table->dateTime('started_at')->index();
             $table->timestamp('completed_at')->nullable()->index();
             $table->integer('duration_seconds')->default(0);
             $table->integer('attempts')->default(0);

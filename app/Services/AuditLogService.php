@@ -9,6 +9,11 @@ class AuditLogService
 {
     /**
      * Log an administrative or system action.
+     *
+     * Admin-initiated actions on a subscriber (suspend, reactivate, edit) are
+     * intentionally logged here AND in SubscriberActivityLogger — this is the
+     * admin-facing audit trail (who/what/diff), while SubscriberActivity is the
+     * subscriber-facing timeline (what happened to their account). Not a duplicate.
      */
     public function log(string $action, string $resourceType, string $resourceId, ?array $oldValues = null, ?array $newValues = null, ?User $user = null): AuditLog
     {
@@ -16,8 +21,13 @@ class AuditLogService
         $sanitizedOld = $oldValues ? $this->sanitize($oldValues) : null;
         $sanitizedNew = $newValues ? $this->sanitize($newValues) : null;
 
+        $actorId = $user?->id;
+        if (! $actorId && auth()->user() instanceof User) {
+            $actorId = auth()->id();
+        }
+
         return AuditLog::create([
-            'user_id' => $user?->id ?? auth()->id(),
+            'user_id' => $actorId,
             'action' => $action,
             'resource_type' => $resourceType,
             'resource_id' => $resourceId,

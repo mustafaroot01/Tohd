@@ -28,7 +28,6 @@ class AdminCurriculumTest extends TestCase
             'name' => 'Admin User',
             'email' => 'admin@test.com',
             'password' => bcrypt('password'),
-            'role' => 'ADMIN',
             'status' => 'ACTIVE',
         ]);
 
@@ -106,5 +105,58 @@ class AdminCurriculumTest extends TestCase
             ->postJson("/api/v1/admin/curriculums/{$currId}/publish");
         $publishRes->assertStatus(200)
             ->assertJsonPath('data.status', 'PUBLISHED');
+    }
+
+    public function test_admin_cannot_publish_curriculum_with_no_content(): void
+    {
+        $token = $this->admin->createToken('admin')->plainTextToken;
+
+        $currRes = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/v1/admin/curriculums', [
+                'code' => 'CURR-EMPTY',
+                'name' => 'منهج فارغ',
+            ]);
+        $currId = $currRes->json('data.id');
+
+        $publishRes = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson("/api/v1/admin/curriculums/{$currId}/publish");
+
+        $publishRes->assertStatus(400)
+            ->assertJsonPath('error_code', 'CURRICULUM_NOT_PUBLISHED');
+
+        $this->assertDatabaseHas('curriculums', [
+            'id' => $currId,
+            'status' => 'DRAFT',
+        ]);
+    }
+
+    public function test_admin_cannot_publish_curriculum_with_a_day_that_has_no_games(): void
+    {
+        $token = $this->admin->createToken('admin')->plainTextToken;
+
+        $currRes = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/v1/admin/curriculums', [
+                'code' => 'CURR-NO-GAMES',
+                'name' => 'منهج بدون ألعاب',
+            ]);
+        $currId = $currRes->json('data.id');
+
+        $monthRes = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson("/api/v1/admin/curriculums/{$currId}/months", ['month_number' => 1, 'name' => 'شهر']);
+        $monthId = $monthRes->json('data.id');
+
+        $weekRes = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson("/api/v1/admin/curriculums/months/{$monthId}/weeks", ['week_number' => 1, 'name' => 'أسبوع']);
+        $weekId = $weekRes->json('data.id');
+
+        // Day added, but no game attached to it.
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson("/api/v1/admin/curriculums/weeks/{$weekId}/days", ['day_number' => 1, 'name' => 'يوم']);
+
+        $publishRes = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson("/api/v1/admin/curriculums/{$currId}/publish");
+
+        $publishRes->assertStatus(400)
+            ->assertJsonPath('error_code', 'CURRICULUM_NOT_PUBLISHED');
     }
 }

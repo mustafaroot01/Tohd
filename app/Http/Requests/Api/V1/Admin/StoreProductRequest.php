@@ -24,7 +24,6 @@ class StoreProductRequest extends FormRequest
             'duration_days' => ['nullable', 'integer', 'min:1', 'max:3650'],
             'status' => ['nullable', new Enum(ProductStatus::class)],
             'price' => ['nullable', 'numeric', 'min:0'],
-            'currency' => ['nullable', 'string', 'max:10'],
             'metadata' => ['nullable', 'array'],
         ];
     }

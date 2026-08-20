@@ -10,6 +10,7 @@ use App\Actions\Games\PublishGameAction;
 use App\Enums\GameType;
 use App\Models\ActivationCode;
 use App\Models\Axis;
+use App\Models\Level;
 use App\Models\Product;
 use App\Models\Skill;
 use App\Models\User;
@@ -27,7 +28,6 @@ class UserTrainingFlowTest extends TestCase
             'name' => 'Admin Faris',
             'email' => 'admin@rihla.com',
             'password' => bcrypt('password123'),
-            'role' => 'ADMIN',
             'status' => 'ACTIVE',
         ]);
 
@@ -46,6 +46,13 @@ class UserTrainingFlowTest extends TestCase
         ]);
 
         // 3. Admin creates and publishes Game
+        $level = Level::create([
+            'level_number' => 1,
+            'name' => 'المستوى الأول',
+            'min_age' => 3,
+            'max_age' => 8,
+        ]);
+
         $createGameAction = app(CreateGameAction::class);
         $publishGameAction = app(PublishGameAction::class);
 
@@ -55,6 +62,7 @@ class UserTrainingFlowTest extends TestCase
             'type' => GameType::TAP,
             'axis_id' => $axis->id,
             'skill_id' => $skill->id,
+            'level_id' => $level->id,
             'config' => [
                 'attempts' => 10,
                 'success_threshold' => 0.8,
@@ -110,14 +118,22 @@ class UserTrainingFlowTest extends TestCase
             'status' => 'AVAILABLE',
         ]);
 
-        // 6. User registers & logs in via API
-        $registerRes = $this->postJson('/api/v1/auth/register', [
+        // 6. User registers, verifies phone via OTP, and receives a token
+        $registerRes = $this->postJson('/api/v1/app/auth/register', [
             'name' => 'فارس الصغير',
-            'email' => 'faris@example.com',
+            'phone' => '07701239999',
             'password' => 'secret123456',
         ]);
         $registerRes->assertStatus(201);
-        $userToken = $registerRes->json('data.token');
+
+        $otpCode = $this->fakeSmsGateway()->lastCodeFor('+9647701239999');
+
+        $verifyRes = $this->postJson('/api/v1/app/auth/otp/verify', [
+            'phone' => '07701239999',
+            'code' => $otpCode,
+        ]);
+        $verifyRes->assertStatus(200);
+        $userToken = $verifyRes->json('data.token');
 
         // 7. User redeems Activation Code
         $redeemRes = $this->withHeader('Authorization', 'Bearer '.$userToken)
@@ -170,7 +186,7 @@ class UserTrainingFlowTest extends TestCase
         $homeRes = $this->withHeader('Authorization', 'Bearer '.$userToken)
             ->getJson('/api/v1/app/home');
         $homeRes->assertStatus(200)
-            ->assertJsonPath('data.user.email', 'faris@example.com')
+            ->assertJsonPath('data.user.phone', '+9647701239999')
             ->assertJsonPath('data.today.day.is_completed', true);
     }
 }

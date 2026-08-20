@@ -3,7 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Skill;
-use App\Models\User;
+use App\Models\Subscriber;
 use App\Services\ProgressCalculationService;
 use Illuminate\Console\Command;
 
@@ -15,7 +15,7 @@ class RecalculateProgressCommand extends Command
     public function handle(ProgressCalculationService $progressService): int
     {
         $userId = $this->argument('user_id');
-        $users = $userId ? User::where('id', $userId)->get() : User::where('role', 'USER')->get();
+        $users = $userId ? Subscriber::where('id', $userId)->get() : Subscriber::all();
         $skills = Skill::all();
 
         $this->info("بدء إعادة احتساب التقدم لعدد ({$users->count()}) مستخدم...");
@@ -24,7 +24,7 @@ class RecalculateProgressCommand extends Command
             foreach ($skills as $skill) {
                 $progressService->updateSkillProgressForUser($user, $skill);
             }
-            $this->line("<info>✔</info> تم تحديث تقدم المستخدم: {$user->name} ({$user->email})");
+            $this->line("<info>✔</info> تم تحديث تقدم المستخدم: {$user->name} ({$user->phone})");
         }
 
         $this->info('تمت إعادة احتساب وتحديث سجلات التقدم بنجاح!');

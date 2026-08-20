@@ -24,9 +24,18 @@ class UpdateGameAction
             $oldValues = $game->toArray();
 
             $updateData = [];
-            foreach (['name', 'slug', 'description', 'axis_id', 'skill_id', 'level', 'difficulty', 'min_age', 'max_age', 'duration_seconds'] as $field) {
+            foreach (['name', 'slug', 'description', 'axis_id', 'skill_id', 'level_id', 'level', 'difficulty', 'min_age', 'max_age', 'duration_seconds'] as $field) {
                 if (array_key_exists($field, $data)) {
                     $updateData[$field] = $data[$field];
+                }
+            }
+
+            if (isset($data['level_id'])) {
+                $levelModel = \App\Models\Level::find($data['level_id']);
+                if ($levelModel) {
+                    $updateData['level'] = $levelModel->level_number;
+                    $updateData['min_age'] = $levelModel->min_age;
+                    $updateData['max_age'] = $levelModel->max_age;
                 }
             }
 

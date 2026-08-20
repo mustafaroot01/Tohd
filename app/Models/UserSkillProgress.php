@@ -14,7 +14,7 @@ class UserSkillProgress extends Model
     protected $table = 'user_skill_progress';
 
     protected $fillable = [
-        'user_id',
+        'subscriber_id',
         'skill_id',
         'games_completed',
         'total_sessions',
@@ -38,7 +38,7 @@ class UserSkillProgress extends Model
 
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(Subscriber::class, 'subscriber_id');
     }
 
     public function skill(): BelongsTo

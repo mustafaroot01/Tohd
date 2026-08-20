@@ -24,9 +24,14 @@ class Product extends Model
         'duration_days',
         'status',
         'price',
-        'currency',
         'metadata',
     ];
+
+    /**
+     * The platform operates in Iraqi Dinar (IQD) only — there is no per-product
+     * currency selection, so revenue aggregation never mixes units.
+     */
+    public const CURRENCY = 'IQD';
 
     protected function casts(): array
     {

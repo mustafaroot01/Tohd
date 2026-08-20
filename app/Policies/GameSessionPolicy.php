@@ -9,11 +9,11 @@ class GameSessionPolicy
 {
     public function view(User $user, GameSession $session): bool
     {
-        return $user->isAdmin() || $session->user_id === $user->id;
+        return true;
     }
 
     public function complete(User $user, GameSession $session): bool
     {
-        return $session->user_id === $user->id;
+        return $session->subscriber_id === $user->id;
     }
 }

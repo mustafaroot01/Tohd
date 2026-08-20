@@ -14,7 +14,7 @@ class GamePolicy
 
     public function view(User $user, Game $game): bool
     {
-        if ($user->isAdmin()) {
+        if (true) {
             return true;
         }
 
@@ -23,21 +23,21 @@ class GamePolicy
 
     public function create(User $user): bool
     {
-        return $user->isAdmin();
+        return true;
     }
 
     public function update(User $user, Game $game): bool
     {
-        return $user->isAdmin();
+        return true;
     }
 
     public function delete(User $user, Game $game): bool
     {
-        return $user->isAdmin();
+        return true;
     }
 
     public function publish(User $user, Game $game): bool
     {
-        return $user->isAdmin();
+        return true;
     }
 }

@@ -1,39 +1,16 @@
 <script setup lang="ts">
-import { PerfectScrollbar } from 'vue3-perfect-scrollbar'
-
 const router = useRouter()
 const ability = useAbility()
 
-// TODO: Get type from backend
 const userData = useCookie<any>('userData')
 
 const logout = async () => {
-  // Remove "accessToken" from cookie
   useCookie('accessToken').value = null
-
-  // Remove "userData" from cookie
   userData.value = null
-
-  // Redirect to login page
-  await router.push('/login')
-
-  // ℹ️ We had to remove abilities in then block because if we don't nav menu items mutation is visible while redirecting user to login page
-  // Remove "userAbilities" from cookie
   useCookie('userAbilityRules').value = null
-
-  // Reset ability to initial ability
   ability.update([])
+  await router.push('/login')
 }
-
-const userProfileList = [
-  { type: 'divider' },
-  { type: 'navItem', icon: 'tabler-user', title: 'Profile', to: { name: 'apps-user-view-id', params: { id: 21 } } },
-  { type: 'navItem', icon: 'tabler-settings', title: 'Settings', to: { name: 'pages-account-settings-tab', params: { tab: 'account' } } },
-  { type: 'navItem', icon: 'tabler-file-dollar', title: 'Billing Plan', to: { name: 'pages-account-settings-tab', params: { tab: 'billing-plans' } }, badgeProps: { color: 'error', content: '4' } },
-  { type: 'divider' },
-  { type: 'navItem', icon: 'tabler-currency-dollar', title: 'Pricing', to: { name: 'pages-pricing' } },
-  { type: 'navItem', icon: 'tabler-question-mark', title: 'FAQ', to: { name: 'pages-faq' } },
-]
 </script>
 
 <template>
@@ -61,103 +38,81 @@ const userProfileList = [
         icon="tabler-user"
       />
 
-      <!-- SECTION Menu -->
       <VMenu
         activator="parent"
         width="240"
         location="bottom end"
         offset="12px"
       >
-        <VList>
-          <VListItem>
-            <div class="d-flex gap-2 align-center">
-              <VListItemAction>
-                <VBadge
-                  dot
-                  location="bottom right"
-                  offset-x="3"
-                  offset-y="3"
-                  color="success"
-                  bordered
+        <VList class="pa-0">
+          <!-- User Info -->
+          <VListItem class="pa-4">
+            <div class="d-flex gap-3 align-center">
+              <VBadge
+                dot
+                location="bottom right"
+                offset-x="3"
+                offset-y="3"
+                color="success"
+                bordered
+              >
+                <VAvatar
+                  size="44"
+                  :color="!(userData && userData.avatar) ? 'primary' : undefined"
+                  :variant="!(userData && userData.avatar) ? 'tonal' : undefined"
                 >
-                  <VAvatar
-                    :color="!(userData && userData.avatar) ? 'primary' : undefined"
-                    :variant="!(userData && userData.avatar) ? 'tonal' : undefined"
-                  >
-                    <VImg
-                      v-if="userData && userData.avatar"
-                      :src="userData.avatar"
-                    />
-                    <VIcon
-                      v-else
-                      icon="tabler-user"
-                    />
-                  </VAvatar>
-                </VBadge>
-              </VListItemAction>
-
+                  <VImg
+                    v-if="userData && userData.avatar"
+                    :src="userData.avatar"
+                  />
+                  <VIcon
+                    v-else
+                    icon="tabler-user"
+                    size="24"
+                  />
+                </VAvatar>
+              </VBadge>
               <div>
-                <h6 class="text-h6 font-weight-medium">
+                <h6 class="text-base font-weight-semibold">
                   {{ userData.fullName || userData.username }}
                 </h6>
-                <VListItemSubtitle class="text-capitalize text-disabled">
-                  {{ userData.role }}
-                </VListItemSubtitle>
+                <span class="text-sm text-disabled text-capitalize">
+                  {{ userData.role === 'admin' ? 'مدير النظام' : userData.role }}
+                </span>
               </div>
             </div>
           </VListItem>
 
-          <PerfectScrollbar :options="{ wheelPropagation: false }">
-            <template
-              v-for="item in userProfileList"
-              :key="item.title"
-            >
-              <VListItem
-                v-if="item.type === 'navItem'"
-                :to="item.to"
-              >
-                <template #prepend>
-                  <VIcon
-                    :icon="item.icon"
-                    size="22"
-                  />
-                </template>
+          <VDivider />
 
-                <VListItemTitle>{{ item.title }}</VListItemTitle>
-
-                <template
-                  v-if="item.badgeProps"
-                  #append
-                >
-                  <VBadge
-                    rounded="sm"
-                    class="me-3"
-                    v-bind="item.badgeProps"
-                  />
-                </template>
-              </VListItem>
-
-              <VDivider
-                v-else
-                class="my-2"
-              />
+          <!-- Account Settings -->
+          <VListItem
+            :to="{ name: 'pages-account-settings-tab', params: { tab: 'account' } }"
+            class="px-3 py-2"
+          >
+            <template #prepend>
+              <VIcon icon="tabler-settings" size="20" class="me-2" />
             </template>
+            <VListItemTitle class="text-sm">إعدادات الحساب</VListItemTitle>
+          </VListItem>
 
-            <div class="px-4 py-2">
-              <VBtn
-                block
-                size="small"
-                color="error"
-                append-icon="tabler-logout"
-                @click="logout"
-              >
-                Logout
-              </VBtn>
-            </div>
-          </PerfectScrollbar>
+          <VDivider />
+
+          <!-- Logout -->
+          <div class="px-3 py-3">
+            <VBtn
+              block
+              variant="tonal"
+              color="error"
+              size="small"
+              prepend-icon="tabler-logout"
+              @click="logout"
+            >
+              تسجيل الخروج
+            </VBtn>
+          </div>
         </VList>
       </VMenu>
-      <!-- !SECTION -->
     </VAvatar>
   </VBadge>
 </template>

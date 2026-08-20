@@ -2,13 +2,13 @@
 
 namespace App\Events;
 
-use App\Models\User;
+use App\Models\Subscriber;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class UserRegistered
+class SubscriberRegistered
 {
     use Dispatchable, SerializesModels;
 
-    public function __construct(public User $user) {}
+    public function __construct(public Subscriber $user) {}
 }

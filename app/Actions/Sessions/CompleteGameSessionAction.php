@@ -3,24 +3,30 @@
 namespace App\Actions\Sessions;
 
 use App\Enums\GameSessionStatus;
+use App\Enums\SubscriberActivityType;
 use App\Events\GameSessionCompleted;
 use App\Exceptions\SessionAlreadyCompletedException;
 use App\Exceptions\UnauthorizedGameSessionException;
 use App\Models\GameSession;
-use App\Models\User;
+use App\Models\Subscriber;
+use App\Services\SubscriberActivityLogger;
 use Illuminate\Support\Facades\DB;
 
 class CompleteGameSessionAction
 {
+    public function __construct(
+        protected SubscriberActivityLogger $activityLogger
+    ) {}
+
     /**
      * Complete a game session with client telemetry and calculate results.
      *
      * @throws UnauthorizedGameSessionException
      * @throws SessionAlreadyCompletedException
      */
-    public function execute(GameSession $session, array $telemetry, User $user): GameSession
+    public function execute(GameSession $session, array $telemetry, Subscriber $user): GameSession
     {
-        if ($session->user_id !== $user->id) {
+        if ($session->subscriber_id !== $user->id) {
             throw new UnauthorizedGameSessionException('غير مصرح لك بإنهاء جلسة تخص مستخدماً آخر.');
         }
 
@@ -28,7 +34,7 @@ class CompleteGameSessionAction
             throw new SessionAlreadyCompletedException('تم إنهاء هذه الجلسة مسبقاً.');
         }
 
-        return DB::transaction(function () use ($session, $telemetry) {
+        return DB::transaction(function () use ($session, $telemetry, $user) {
             $attempts = max(1, (int) ($telemetry['attempts'] ?? 1));
             $correct = max(0, min($attempts, (int) ($telemetry['correct_attempts'] ?? 0)));
             $incorrect = max(0, (int) ($telemetry['incorrect_attempts'] ?? ($attempts - $correct)));
@@ -48,6 +54,15 @@ class CompleteGameSessionAction
                 'accuracy' => $accuracy,
                 'status' => GameSessionStatus::COMPLETED,
                 'metadata' => $metadata,
+            ]);
+
+            $user->update(['last_activity_at' => now()]);
+
+            $this->activityLogger->log($user, SubscriberActivityType::GAME_COMPLETED, [
+                'session_id' => $session->id,
+                'game_id' => $session->game_id,
+                'score' => $session->score,
+                'accuracy' => $session->accuracy,
             ]);
 
             event(new GameSessionCompleted($session));

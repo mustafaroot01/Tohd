@@ -25,6 +25,7 @@ class UpdateGameRequest extends FormRequest
             'type' => ['sometimes', 'required', new Enum(GameType::class)],
             'axis_id' => ['sometimes', 'required', 'uuid', 'exists:axes,id'],
             'skill_id' => ['sometimes', 'required', 'uuid', 'exists:skills,id'],
+            'level_id' => ['sometimes', 'required', 'uuid', 'exists:levels,id'],
             'level' => ['sometimes', 'integer', 'min:1', 'max:20'],
             'difficulty' => ['sometimes', 'string', 'in:easy,medium,hard'],
             'min_age' => ['sometimes', 'integer', 'min:1', 'max:18'],

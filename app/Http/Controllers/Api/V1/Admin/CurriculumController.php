@@ -134,12 +134,42 @@ class CurriculumController extends Controller
 
     public function addDay(StoreCurriculumDayRequest $request, CurriculumWeek $week, AddDayAction $action): JsonResponse
     {
+        if ($week->days()->count() >= 7) {
+            return ApiResponse::error('لا يمكن إضافة أكثر من 7 أيام في الأسبوع الواحد.', Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
         $day = $action->execute($week, $request->validated());
 
         return ApiResponse::success(
             data: $day,
             message: 'تمت إضافة اليوم إلى الأسبوع بنجاح',
             status: Response::HTTP_CREATED
+        );
+    }
+
+    public function updateDay(Request $request, CurriculumDay $day): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'estimated_duration_seconds' => ['required', 'integer', 'min:60'],
+            'sort_order' => ['sometimes', 'integer', 'min:1'],
+        ]);
+
+        $day->update($validated);
+
+        return ApiResponse::success(
+            data: $day,
+            message: 'تم تحديث بيانات اليوم بنجاح'
+        );
+    }
+
+    public function deleteDay(CurriculumDay $day): JsonResponse
+    {
+        $day->delete();
+
+        return ApiResponse::success(
+            data: null,
+            message: 'تم حذف اليوم بنجاح'
         );
     }
 

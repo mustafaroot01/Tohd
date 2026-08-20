@@ -8,6 +8,7 @@ enum AssignmentStatus: string
     case COMPLETED = 'COMPLETED';
     case EXPIRED = 'EXPIRED';
     case PAUSED = 'PAUSED';
+    case CANCELLED = 'CANCELLED';
 
     public function isValid(): bool
     {

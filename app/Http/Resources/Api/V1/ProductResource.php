@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Api\V1;
 
+use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -20,7 +21,7 @@ class ProductResource extends JsonResource
             'duration_days' => $this->duration_days,
             'status' => $this->status?->value ?? (string) $this->status,
             'price' => (float) $this->price,
-            'currency' => $this->currency,
+            'currency' => Product::CURRENCY,
             'metadata' => $this->metadata,
             'created_at' => $this->created_at?->toISOString(),
         ];

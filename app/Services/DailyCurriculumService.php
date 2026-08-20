@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Models\User;
+use App\Models\Subscriber;
 
 class DailyCurriculumService
 {
@@ -13,7 +13,7 @@ class DailyCurriculumService
     /**
      * Get the full today's curriculum plan for the user.
      */
-    public function getTodayPlan(User $user): array
+    public function getTodayPlan(Subscriber $user): array
     {
         $context = $this->resolver->resolve($user);
         $currentDay = $context['current_day'];

@@ -7,6 +7,7 @@ import { VerticalNavGroup, VerticalNavLink, VerticalNavSectionTitle } from '@lay
 import { useLayoutConfigStore } from '@layouts/stores/config'
 import { injectionKeyIsVerticalNavHovered } from '@layouts/symbols'
 import type { NavGroup, NavLink, NavSectionTitle, VerticalNavItems } from '@layouts/types'
+import { useSettingsStore } from '@/stores/settingsStore'
 
 interface Props {
   tag?: string | Component
@@ -26,6 +27,7 @@ const isHovered = useElementHover(refNav)
 provide(injectionKeyIsVerticalNavHovered, isHovered)
 
 const configStore = useLayoutConfigStore()
+const settingsStore = useSettingsStore()
 
 const resolveNavItemComponent = (item: NavLink | NavSectionTitle | NavGroup): unknown => {
   if ('heading' in item)
@@ -78,14 +80,20 @@ const hideTitleAndIcon = configStore.isVerticalNavMini(isHovered)
           to="/"
           class="app-logo app-title-wrapper"
         >
-          <VNodeRenderer :nodes="layoutConfig.app.logo" />
+          <img
+            v-if="settingsStore.appLogoUrl"
+            :src="settingsStore.appLogoUrl"
+            alt="الشعار"
+            style="max-height: 32px; max-width: 32px; object-fit: contain;"
+          />
+          <VNodeRenderer v-else :nodes="layoutConfig.app.logo" />
 
           <Transition name="vertical-nav-app-title">
             <h1
               v-show="!hideTitleAndIcon"
               class="app-logo-title"
             >
-              {{ layoutConfig.app.title }}
+              {{ settingsStore.appName || layoutConfig.app.title }}
             </h1>
           </Transition>
         </RouterLink>

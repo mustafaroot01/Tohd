@@ -6,15 +6,51 @@ const isAddProductDialogVisible = ref(false)
 const isSubmitting = ref(false)
 const notification = ref<{ text: string; color: string } | null>(null)
 
+// Edit Product State
+const editingProductId = ref<string | null>(null)
+
 const newProduct = ref({
   code: '',
   name: '',
   description: '',
   curriculum_id: '',
   duration_days: 30,
-  price: 199,
-  currency: 'SAR',
+  price: 25000,
 })
+
+const generateProductCode = () => {
+  const random = Array.from({ length: 6 }, () => '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 36)]).join('')
+  return `PROD-${random}`
+}
+
+const openAddProductDialog = () => {
+  editingProductId.value = null
+  newProduct.value = {
+    code: generateProductCode(),
+    name: '',
+    description: '',
+    curriculum_id: '',
+    duration_days: 30,
+    price: 25000,
+  }
+  isAddProductDialogVisible.value = true
+}
+
+
+const openEditProductDialog = (prod: any) => {
+  editingProductId.value = prod.id
+  newProduct.value = {
+    code: prod.code,
+    name: prod.name,
+    description: prod.description || '',
+    curriculum_id: prod.curriculum_id || '',
+    duration_days: prod.duration_days,
+    price: prod.price,
+  }
+  isAddProductDialogVisible.value = true
+}
+
+
 
 const fetchProducts = async () => {
   isLoading.value = true
@@ -41,14 +77,21 @@ const saveProduct = async () => {
 
   isSubmitting.value = true
   try {
-    const res = await $api('/admin/products', {
-      method: 'POST',
+    const isEdit = !!editingProductId.value
+    const url = isEdit ? `/admin/products/${editingProductId.value}` : '/admin/products'
+    const method = isEdit ? 'PUT' : 'POST'
+
+    const res = await $api(url, {
+      method,
       body: newProduct.value,
     })
     if (res?.success) {
       isAddProductDialogVisible.value = false
-      newProduct.value = { code: '', name: '', description: '', curriculum_id: '', duration_days: 30, price: 199, currency: 'SAR' }
-      notification.value = { text: 'تمت إضافة الباقة بنجاح!', color: 'success' }
+      newProduct.value = { code: '', name: '', description: '', curriculum_id: '', duration_days: 30, price: 25000 }
+      notification.value = { 
+        text: isEdit ? 'تم تحديث بيانات الباقة بنجاح!' : 'تمت إضافة الباقة بنجاح!', 
+        color: 'success' 
+      }
       await fetchProducts()
     }
   }
@@ -59,6 +102,7 @@ const saveProduct = async () => {
     isSubmitting.value = false
   }
 }
+
 
 const toggleStatus = async (product: any) => {
   try {
@@ -94,7 +138,7 @@ onMounted(() => {
       <VBtn
         color="primary"
         prepend-icon="tabler-plus"
-        @click="isAddProductDialogVisible = true"
+        @click="openAddProductDialog"
       >
         إضافة باقة جديدة
       </VBtn>
@@ -147,8 +191,8 @@ onMounted(() => {
 
           <VCardText>
             <div class="d-flex align-center gap-2 mb-4">
-              <span class="text-h4 font-weight-bold text-primary">{{ prod.price }}</span>
-              <span class="text-subtitle-1 text-muted">{{ prod.currency }}</span>
+              <span class="text-h4 font-weight-bold text-primary">{{ Number(prod.price).toLocaleString() }}</span>
+              <span class="text-subtitle-1 text-muted">{{ prod.currency === 'IQD' ? 'دينار عراقي' : prod.currency }}</span>
               <VChip size="small" color="info" variant="tonal" class="ms-auto">
                 {{ prod.duration_days }} يوماً
               </VChip>
@@ -161,16 +205,26 @@ onMounted(() => {
             <div class="bg-background pa-3 rounded text-caption mb-4">
               <div class="d-flex justify-space-between mb-1">
                 <span class="text-muted">المنهج المرتبط:</span>
-                <span class="font-weight-bold">{{ prod.curriculum?.name || 'غير مرتبط' }}</span>
+                <span class="font-weight-bold">{{ prod.curriculum_name || 'غير مرتبط' }}</span>
               </div>
             </div>
 
             <div class="d-flex gap-2">
               <VBtn
                 size="small"
+                variant="flat"
+                color="warning"
+                class="flex-grow-1"
+                prepend-icon="tabler-edit"
+                @click="openEditProductDialog(prod)"
+              >
+                تعديل
+              </VBtn>
+              <VBtn
+                size="small"
                 variant="tonal"
                 :color="prod.status === 'ACTIVE' ? 'warning' : 'success'"
-                block
+                class="flex-grow-1"
                 @click="toggleStatus(prod)"
               >
                 {{ prod.status === 'ACTIVE' ? 'إيقاف الباقة' : 'تفعيل الباقة' }}
@@ -185,10 +239,12 @@ onMounted(() => {
       <VProgressCircular indeterminate color="primary" size="48" />
     </div>
 
-    <!-- Create Product Dialog -->
+    <!-- Create/Edit Product Dialog -->
     <VDialog v-model="isAddProductDialogVisible" max-width="550">
       <VCard>
-        <VCardTitle class="pa-4 font-weight-bold">إضافة باقة / منتج تدريبي</VCardTitle>
+        <VCardTitle class="pa-4 font-weight-bold">
+          {{ editingProductId ? 'تعديل باقة الاشتراك التدريبية' : 'إضافة باقة / منتج تدريبي' }}
+        </VCardTitle>
         <VDivider />
         <VCardText class="pa-4">
           <VRow>
@@ -196,7 +252,10 @@ onMounted(() => {
               <VTextField
                 v-model="newProduct.code"
                 label="كود المنتج"
-                placeholder="مثال: PROD-60D"
+                readonly
+                dir="ltr"
+                hint="يُولَّد تلقائياً"
+                persistent-hint
               />
             </VCol>
             <VCol cols="12" sm="6">
@@ -229,7 +288,7 @@ onMounted(() => {
               <VTextField
                 v-model.number="newProduct.price"
                 type="number"
-                label="السعر (بالريال)"
+                label="السعر (بالدينار العراقي)"
               />
             </VCol>
 

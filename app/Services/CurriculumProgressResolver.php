@@ -6,7 +6,7 @@ use App\Enums\GameSessionStatus;
 use App\Exceptions\NoActiveCurriculumException;
 use App\Models\CurriculumDay;
 use App\Models\GameSession;
-use App\Models\User;
+use App\Models\Subscriber;
 use App\Models\UserCurriculumAssignment;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -28,7 +28,7 @@ class CurriculumProgressResolver
      *
      * @throws NoActiveCurriculumException
      */
-    public function resolve(User $user, ?Carbon $asOfDate = null): array
+    public function resolve(Subscriber $user, ?Carbon $asOfDate = null): array
     {
         $assignment = $user->activeCurriculumAssignment;
 
@@ -61,7 +61,7 @@ class CurriculumProgressResolver
         $currentDay = $allDays[$dayIndex];
 
         // Fetch completed games for this day
-        $completedGameIds = GameSession::where('user_id', $user->id)
+        $completedGameIds = GameSession::where('subscriber_id', $user->id)
             ->where('curriculum_day_id', $currentDay->id)
             ->where('status', GameSessionStatus::COMPLETED)
             ->pluck('game_id')

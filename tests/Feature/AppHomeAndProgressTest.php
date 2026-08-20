@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\User;
+use App\Models\Subscriber;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -12,11 +12,10 @@ class AppHomeAndProgressTest extends TestCase
 
     public function test_user_can_access_progress_and_home_apis(): void
     {
-        $user = User::create([
+        $user = Subscriber::create([
             'name' => 'Faris User',
-            'email' => 'faris_home@test.com',
+            'phone' => '+9647703333333',
             'password' => bcrypt('password'),
-            'role' => 'USER',
             'status' => 'ACTIVE',
         ]);
 

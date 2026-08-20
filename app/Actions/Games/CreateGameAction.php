@@ -25,6 +25,8 @@ class CreateGameAction
         return DB::transaction(function () use ($data, $creator) {
             $config = $this->configBuilder->build($data['type'], $data['config'] ?? []);
 
+            $levelModel = \App\Models\Level::find($data['level_id']);
+
             $game = Game::create([
                 'code' => $data['code'] ?? 'GAM-'.strtoupper(Str::random(6)),
                 'name' => $data['name'],
@@ -33,10 +35,11 @@ class CreateGameAction
                 'type' => $data['type'],
                 'axis_id' => $data['axis_id'],
                 'skill_id' => $data['skill_id'],
-                'level' => $data['level'] ?? 1,
+                'level_id' => $data['level_id'],
+                'level' => $levelModel ? $levelModel->level_number : ($data['level'] ?? 1),
                 'difficulty' => $data['difficulty'] ?? 'easy',
-                'min_age' => $data['min_age'] ?? 3,
-                'max_age' => $data['max_age'] ?? 12,
+                'min_age' => $levelModel ? $levelModel->min_age : ($data['min_age'] ?? 3),
+                'max_age' => $levelModel ? $levelModel->max_age : ($data['max_age'] ?? 12),
                 'duration_seconds' => $data['duration_seconds'] ?? 60,
                 'status' => GameStatus::DRAFT,
                 'version' => 1,

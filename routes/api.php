@@ -8,8 +8,14 @@ use App\Http\Controllers\Api\V1\Admin\DashboardController;
 use App\Http\Controllers\Api\V1\Admin\GameController as AdminGameController;
 use App\Http\Controllers\Api\V1\Admin\ProductController;
 use App\Http\Controllers\Api\V1\Admin\SkillController;
+use App\Http\Controllers\Api\V1\Admin\SubscriberController;
 use App\Http\Controllers\Api\V1\Admin\UserController;
+use App\Http\Controllers\Api\V1\Admin\SystemSettingController;
+use App\Http\Controllers\Api\V1\Admin\AdminProfileController;
+use App\Http\Controllers\Api\V1\Admin\GameAssetController;
+use App\Http\Controllers\Api\V1\Admin\LevelController;
 use App\Http\Controllers\Api\V1\App\ActivationController as AppActivationController;
+use App\Http\Controllers\Api\V1\App\AuthController as AppAuthController;
 use App\Http\Controllers\Api\V1\App\CurriculumController as AppCurriculumController;
 use App\Http\Controllers\Api\V1\App\GameController as AppGameController;
 use App\Http\Controllers\Api\V1\App\GameSessionController;
@@ -28,10 +34,9 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')->middleware('force.json')->group(function () {
 
     // ==========================================
-    // 1. Authentication Endpoints
+    // 1. Authentication Endpoints (System Users / Admins)
     // ==========================================
     Route::prefix('auth')->group(function () {
-        Route::post('register', [AuthController::class, 'register'])->middleware('throttle:15,1');
         Route::post('login', [AuthController::class, 'login'])->middleware('throttle:15,1');
 
         Route::middleware('auth:sanctum')->group(function () {
@@ -43,16 +48,22 @@ Route::prefix('v1')->middleware('force.json')->group(function () {
     // ==========================================
     // 2. Admin Dashboard & Management Endpoints
     // ==========================================
-    Route::prefix('admin')->middleware(['auth:sanctum', 'role:ADMIN'])->group(function () {
+    Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function () {
         Route::get('dashboard', [DashboardController::class, 'index']);
+
+        // Profile
+        Route::get('profile', [AdminProfileController::class, 'show']);
+        Route::put('profile', [AdminProfileController::class, 'update']);
 
         Route::apiResource('axes', AxisController::class, ['parameters' => ['axes' => 'axis']]);
         Route::apiResource('skills', SkillController::class);
+        Route::apiResource('levels', LevelController::class);
 
         // Assets / Lottie Management
         Route::get('assets', [AssetController::class, 'index']);
         Route::post('assets', [AssetController::class, 'store']);
         Route::get('assets/{asset}', [AssetController::class, 'show']);
+        Route::post('assets/{asset}', [AssetController::class, 'update']);
         Route::delete('assets/{asset}', [AssetController::class, 'destroy']);
 
         // Games Management & Publishing Lifecycle
@@ -62,12 +73,20 @@ Route::prefix('v1')->middleware('force.json')->group(function () {
         Route::post('games/{game}/publish', [AdminGameController::class, 'publish']);
         Route::post('games/{game}/archive', [AdminGameController::class, 'archive']);
 
+        // Game Assets (Lottie linking)
+        Route::get('games/{game}/assets', [GameAssetController::class, 'index']);
+        Route::post('games/{game}/assets', [GameAssetController::class, 'attach']);
+        Route::put('games/{game}/assets/{gameAsset}', [GameAssetController::class, 'updateRole']);
+        Route::delete('games/{game}/assets/{gameAsset}', [GameAssetController::class, 'detach']);
+
         // Curriculum Builder & Structure
         Route::apiResource('curriculums', AdminCurriculumController::class);
         Route::post('curriculums/{curriculum}/publish', [AdminCurriculumController::class, 'publish']);
         Route::post('curriculums/{curriculum}/months', [AdminCurriculumController::class, 'addMonth']);
         Route::post('curriculums/months/{month}/weeks', [AdminCurriculumController::class, 'addWeek']);
         Route::post('curriculums/weeks/{week}/days', [AdminCurriculumController::class, 'addDay']);
+        Route::put('curriculums/days/{day}', [AdminCurriculumController::class, 'updateDay']);
+        Route::delete('curriculums/days/{day}', [AdminCurriculumController::class, 'deleteDay']);
         Route::post('curriculums/days/{day}/games', [AdminCurriculumController::class, 'attachGame']);
         Route::delete('curriculums/days/{day}/games/{game}', [AdminCurriculumController::class, 'detachGame']);
 
@@ -82,15 +101,45 @@ Route::prefix('v1')->middleware('force.json')->group(function () {
         Route::get('activation-codes/{activation}', [ActivationCodeController::class, 'show']);
         Route::post('activation-codes/{activation}/revoke', [ActivationCodeController::class, 'revoke']);
 
-        // Users Overview
+        // System Users Overview
         Route::get('users', [UserController::class, 'index']);
         Route::get('users/{user}', [UserController::class, 'show']);
+
+        // Subscribers Management
+        Route::get('subscribers', [SubscriberController::class, 'index']);
+        Route::post('subscribers', [SubscriberController::class, 'store']);
+        Route::get('subscribers/{subscriber}', [SubscriberController::class, 'show']);
+        Route::put('subscribers/{subscriber}', [SubscriberController::class, 'update']);
+        Route::post('subscribers/{subscriber}/suspend', [SubscriberController::class, 'suspend']);
+        Route::post('subscribers/{subscriber}/reactivate', [SubscriberController::class, 'reactivate']);
+        Route::post('subscribers/{subscriber}/assignments/{assignment}/cancel', [SubscriberController::class, 'cancelAssignment']);
+
+        // System Settings Management
+        Route::get('settings', [SystemSettingController::class, 'index']);
+        Route::post('settings', [SystemSettingController::class, 'update']);
+        Route::post('settings/test-sms', [SystemSettingController::class, 'testSms']);
     });
 
+    // Public Config / Branding Endpoints
+    Route::get('settings/public', [SystemSettingController::class, 'getPublicSettings']);
+
     // ==========================================
-    // 3. Single-Account Mobile App Endpoints
+    // 3. Single-Account Mobile App Endpoints (Subscribers)
     // ==========================================
-    Route::prefix('app')->middleware(['auth:sanctum', 'role:USER'])->group(function () {
+    Route::prefix('app')->middleware('maintenance')->group(function () {
+        // Subscriber Authentication
+        Route::prefix('auth')->group(function () {
+            Route::post('register', [AppAuthController::class, 'register'])->middleware('throttle:15,1');
+            Route::post('otp/verify', [AppAuthController::class, 'verifyOtp'])->middleware('throttle:10,1');
+            Route::post('otp/resend', [AppAuthController::class, 'resendOtp'])->middleware('throttle:5,1');
+            Route::post('login', [AppAuthController::class, 'login'])->middleware('throttle:15,1');
+            Route::post('password/forgot', [AppAuthController::class, 'forgotPassword'])->middleware('throttle:5,1');
+            Route::post('password/reset', [AppAuthController::class, 'resetPassword'])->middleware('throttle:10,1');
+            Route::post('logout', [AppAuthController::class, 'logout'])->middleware(['auth:sanctum', 'subscriber']);
+        });
+    });
+
+    Route::prefix('app')->middleware(['maintenance', 'auth:sanctum', 'subscriber'])->group(function () {
         // App Home & Profile
         Route::get('home', [HomeController::class, 'index']);
         Route::get('profile', [ProfileController::class, 'show']);

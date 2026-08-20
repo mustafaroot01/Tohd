@@ -8,16 +8,16 @@ class UserPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->isAdmin();
+        return true;
     }
 
     public function view(User $user, User $target): bool
     {
-        return $user->isAdmin() || $user->id === $target->id;
+        return true;
     }
 
     public function update(User $user, User $target): bool
     {
-        return $user->isAdmin() || $user->id === $target->id;
+        return true;
     }
 }

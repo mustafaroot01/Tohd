@@ -10,13 +10,13 @@ use Illuminate\Support\Facades\Hash;
 class LoginUserAction
 {
     /**
-     * Authenticate a user and issue a Sanctum token.
+     * Authenticate a system user (admin) and issue a Sanctum token.
      *
      * @return array{user: User, token: string}
      *
      * @throws DomainException
      */
-    public function execute(string $email, string $password, ?string $deviceName = 'auth_token'): array
+    public function execute(string $email, string $password, ?string $deviceName = 'admin_dashboard'): array
     {
         $user = User::where('email', strtolower(trim($email)))->first();
 
@@ -30,8 +30,7 @@ class LoginUserAction
 
         $user->update(['last_login_at' => now()]);
 
-        $tokenName = $deviceName ?: ($user->isAdmin() ? 'admin_dashboard' : 'mobile_app');
-        $token = $user->createToken($tokenName)->plainTextToken;
+        $token = $user->createToken($deviceName ?: 'admin_dashboard')->plainTextToken;
 
         event(new UserLoggedIn($user));
 

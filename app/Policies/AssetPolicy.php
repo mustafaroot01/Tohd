@@ -9,7 +9,7 @@ class AssetPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->isAdmin();
+        return true;
     }
 
     public function view(User $user, Asset $asset): bool
@@ -19,11 +19,11 @@ class AssetPolicy
 
     public function create(User $user): bool
     {
-        return $user->isAdmin();
+        return true;
     }
 
     public function delete(User $user, Asset $asset): bool
     {
-        return $user->isAdmin();
+        return true;
     }
 }

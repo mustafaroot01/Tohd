@@ -24,6 +24,7 @@ class StoreGameRequest extends FormRequest
             'type' => ['required', new Enum(GameType::class)],
             'axis_id' => ['required', 'uuid', 'exists:axes,id'],
             'skill_id' => ['required', 'uuid', 'exists:skills,id'],
+            'level_id' => ['required', 'uuid', 'exists:levels,id'],
             'level' => ['nullable', 'integer', 'min:1', 'max:20'],
             'difficulty' => ['nullable', 'string', 'in:easy,medium,hard'],
             'min_age' => ['nullable', 'integer', 'min:1', 'max:18'],

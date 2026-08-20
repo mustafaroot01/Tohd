@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Subscriber;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -10,55 +11,73 @@ class AuthTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_user_can_register_via_api(): void
+    public function test_subscriber_can_register_and_gets_unverified_status_without_token(): void
     {
-        $response = $this->postJson('/api/v1/auth/register', [
+        $response = $this->postJson('/api/v1/app/auth/register', [
             'name' => 'فهد البطل',
-            'email' => 'fahad@example.com',
+            'phone' => '07701234567',
             'password' => 'secret123456',
+            'address' => 'بغداد',
         ]);
 
         $response->assertStatus(201)
             ->assertJson([
                 'success' => true,
-                'message' => 'تم تسجيل الحساب بنجاح',
             ])
-            ->assertJsonStructure([
-                'data' => [
-                    'user' => ['id', 'name', 'email', 'role'],
-                    'token',
-                    'token_type',
-                ],
-            ]);
+            ->assertJsonPath('data.user.status', 'UNVERIFIED')
+            ->assertJsonMissingPath('data.token');
 
-        $this->assertDatabaseHas('users', ['email' => 'fahad@example.com']);
+        $this->assertDatabaseHas('subscribers', ['phone' => '+9647701234567', 'status' => 'UNVERIFIED']);
+
+        $this->assertNotNull($this->fakeSmsGateway()->lastCodeFor('+9647701234567'));
     }
 
-    public function test_user_can_login_with_valid_credentials(): void
+    public function test_subscriber_can_verify_otp_and_login_afterwards(): void
     {
-        $user = User::create([
+        $this->postJson('/api/v1/app/auth/register', [
             'name' => 'سارة',
-            'email' => 'sara@example.com',
-            'password' => bcrypt('password123'),
-            'role' => 'USER',
-            'status' => 'ACTIVE',
+            'phone' => '07709876543',
+            'password' => 'password123',
+        ])->assertStatus(201);
+
+        $code = $this->fakeSmsGateway()->lastCodeFor('+9647709876543');
+
+        $verifyRes = $this->postJson('/api/v1/app/auth/otp/verify', [
+            'phone' => '07709876543',
+            'code' => $code,
         ]);
 
-        $response = $this->postJson('/api/v1/auth/login', [
-            'email' => 'sara@example.com',
+        $verifyRes->assertStatus(200)
+            ->assertJsonPath('data.user.status', 'ACTIVE')
+            ->assertJsonStructure(['data' => ['user', 'token', 'token_type']]);
+
+        $loginRes = $this->postJson('/api/v1/app/auth/login', [
+            'phone' => '07709876543',
             'password' => 'password123',
         ]);
 
-        $response->assertStatus(200)
-            ->assertJson([
-                'success' => true,
-            ])
-            ->assertJsonStructure([
-                'data' => ['user', 'token'],
-            ]);
+        $loginRes->assertStatus(200)->assertJsonPath('success', true);
     }
 
-    public function test_user_cannot_login_with_invalid_credentials(): void
+    public function test_unverified_subscriber_cannot_login(): void
+    {
+        Subscriber::create([
+            'name' => 'غير موثق',
+            'phone' => '+9647701112222',
+            'password' => bcrypt('password123'),
+            'status' => 'UNVERIFIED',
+        ]);
+
+        $response = $this->postJson('/api/v1/app/auth/login', [
+            'phone' => '07701112222',
+            'password' => 'password123',
+        ]);
+
+        $response->assertStatus(403)
+            ->assertJsonPath('error_code', 'ACCOUNT_UNVERIFIED');
+    }
+
+    public function test_admin_cannot_login_with_invalid_credentials(): void
     {
         $response = $this->postJson('/api/v1/auth/login', [
             'email' => 'nonexistent@example.com',
@@ -72,23 +91,22 @@ class AuthTest extends TestCase
             ]);
     }
 
-    public function test_authenticated_user_can_fetch_profile_and_logout(): void
+    public function test_authenticated_admin_can_fetch_profile_and_logout(): void
     {
-        $user = User::create([
-            'name' => 'سارة',
-            'email' => 'sara2@example.com',
+        $admin = User::create([
+            'name' => 'مدير',
+            'email' => 'admin2@example.com',
             'password' => bcrypt('password123'),
-            'role' => 'USER',
             'status' => 'ACTIVE',
         ]);
 
-        $token = $user->createToken('test_token')->plainTextToken;
+        $token = $admin->createToken('test_token')->plainTextToken;
 
         $meResponse = $this->withHeader('Authorization', 'Bearer '.$token)
             ->getJson('/api/v1/auth/me');
 
         $meResponse->assertStatus(200)
-            ->assertJsonPath('data.email', 'sara2@example.com');
+            ->assertJsonPath('data.email', 'admin2@example.com');
 
         $logoutResponse = $this->withHeader('Authorization', 'Bearer '.$token)
             ->postJson('/api/v1/auth/logout');

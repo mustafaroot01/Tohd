@@ -5,7 +5,7 @@ namespace App\Actions\Sessions;
 use App\Enums\GameSessionStatus;
 use App\Exceptions\UnauthorizedGameSessionException;
 use App\Models\GameSession;
-use App\Models\User;
+use App\Models\Subscriber;
 
 class AbandonGameSessionAction
 {
@@ -14,9 +14,9 @@ class AbandonGameSessionAction
      *
      * @throws UnauthorizedGameSessionException
      */
-    public function execute(GameSession $session, User $user): GameSession
+    public function execute(GameSession $session, Subscriber $user): GameSession
     {
-        if ($session->user_id !== $user->id) {
+        if ($session->subscriber_id !== $user->id) {
             throw new UnauthorizedGameSessionException('غير مصرح لك بتعديل جلسة مستخدم آخر.');
         }
 

@@ -16,10 +16,6 @@ class UserController extends Controller
         $perPage = min((int) $request->input('per_page', 20), 100);
         $query = User::latest();
 
-        if ($request->filled('role')) {
-            $query->where('role', $request->input('role'));
-        }
-
         if ($request->filled('status')) {
             $query->where('status', $request->input('status'));
         }
@@ -36,7 +32,7 @@ class UserController extends Controller
 
         return ApiResponse::success(
             data: UserResource::collection($users),
-            message: 'تم استرجاع قائمة المستخدمين بنجاح',
+            message: 'تم استرجاع قائمة مستخدمي النظام بنجاح',
             meta: [
                 'current_page' => $users->currentPage(),
                 'per_page' => $users->perPage(),
@@ -47,7 +43,7 @@ class UserController extends Controller
 
     public function show(User $user): JsonResponse
     {
-        $user->load(['curriculumAssignments.curriculum', 'activations']);
+        $user->load(['auditLogs']);
 
         return ApiResponse::success(
             data: new UserResource($user),

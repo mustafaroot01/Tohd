@@ -49,6 +49,7 @@ dist-ssr
 !.vscode/*.code-snippets
 !.vscode/tours
 .idea
+.claude
 *.suo
 *.ntvs*
 *.njsproj

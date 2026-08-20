@@ -9,6 +9,9 @@ import authV2MaskDark from '@images/pages/misc-mask-dark.png'
 import authV2MaskLight from '@images/pages/misc-mask-light.png'
 import { VNodeRenderer } from '@layouts/components/VNodeRenderer'
 import { themeConfig } from '@themeConfig'
+import { useSettingsStore } from '@/stores/settingsStore'
+
+const settingsStore = useSettingsStore()
 
 const authThemeImg = useGenerateImageVariant(
   authV2LoginIllustrationLight,
@@ -79,7 +82,7 @@ const login = async () => {
         fullName: user.name,
         username: user.name,
         email: user.email,
-        role: user.role.toLowerCase(),
+        role: 'admin',
         avatar: undefined,
         abilityRules: userAbilityRules,
       }
@@ -112,9 +115,17 @@ const onSubmit = () => {
 <template>
   <RouterLink to="/">
     <div class="auth-logo d-flex align-center gap-x-3">
-      <VNodeRenderer :nodes="themeConfig.app.logo" />
+      <img
+        v-if="settingsStore.appLogoUrl"
+        :src="settingsStore.appLogoUrl"
+        alt="logo"
+        height="32"
+        width="32"
+        style="object-fit: contain;"
+      >
+      <VNodeRenderer v-else :nodes="themeConfig.app.logo" />
       <h1 class="auth-title">
-        منصة رحلة فارس
+        {{ settingsStore.appName }}
       </h1>
     </div>
   </RouterLink>
@@ -132,17 +143,49 @@ const onSubmit = () => {
           class="d-flex align-center justify-center w-100 h-100 flex-column"
           style="padding-inline: 6.25rem;"
         >
-          <VImg
-            max-width="500"
-            :src="authThemeImg"
-            class="auth-illustration mt-16 mb-2"
-          />
-          <h2 class="text-h4 font-weight-bold text-primary mt-4">
-            منصة التدريب التفاعلي للأطفال
-          </h2>
-          <p class="text-subtitle-1 text-muted text-center max-w-lg mt-2">
-            بيئة تفاعلية تعتمد على أحدث تقنيات تتبع الانتباه والرسوم المتحركة التفاعلية لدعم مهارات الطفل
-          </p>
+          <!-- Custom brand layout in the blank space -->
+          <div class="d-flex flex-column align-center text-center">
+            <!-- App Logo -->
+            <div
+              v-if="settingsStore.appLogoUrl"
+              class="mb-6 d-flex align-center justify-center"
+              style="max-width: 280px; max-height: 180px;"
+            >
+              <img
+                :src="settingsStore.appLogoUrl"
+                alt="Logo"
+                style="max-width: 100%; max-height: 100%; object-fit: contain;"
+              >
+            </div>
+            <VAvatar
+              v-else
+              color="primary"
+              variant="tonal"
+              size="200"
+              class="mb-6 elevation-4"
+            >
+              <VIcon icon="tabler-smart-home" size="100" />
+            </VAvatar>
+
+            <!-- App Name -->
+            <h1 class="text-h1 font-weight-bold text-primary mb-3">
+              {{ settingsStore.appName }}
+            </h1>
+
+            <!-- Control Panel Title -->
+            <VChip
+              color="primary"
+              variant="tonal"
+              size="large"
+              class="px-8 py-6 font-weight-bold text-h4"
+            >
+              لوحة التحكم والإدارة
+            </VChip>
+
+            <p class="text-subtitle-1 text-muted text-center max-w-lg mt-6">
+              مرحباً بك في نظام الإدارة والتحكم للمنصة التدريبية التفاعلية للأطفال
+            </p>
+          </div>
         </div>
 
         <img
@@ -190,11 +233,8 @@ const onSubmit = () => {
             variant="tonal"
             class="mb-4"
           >
-            <p class="text-sm mb-1">
-              🔹 <strong>حساب المدير:</strong> admin@demo.com / كلمة المرور: <code>admin123456</code>
-            </p>
             <p class="text-sm mb-0">
-              🔹 <strong>حساب المستخدم:</strong> user@demo.com / كلمة المرور: <code>user123456</code>
+              🔹 <strong>حساب مدير النظام:</strong> admin@demo.com / كلمة المرور: <code>admin123456</code>
             </p>
           </VAlert>
 

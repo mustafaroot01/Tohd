@@ -8,18 +8,21 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class UserCurriculumAssignment extends Model
 {
-    use HasFactory, HasUuids;
+    use HasFactory, HasUuids, SoftDeletes;
 
     protected $fillable = [
-        'user_id',
+        'subscriber_id',
         'curriculum_id',
         'activation_id',
         'starts_at',
         'ends_at',
         'status',
+        'cancelled_at',
+        'cancellation_reason',
     ];
 
     protected function casts(): array
@@ -28,6 +31,7 @@ class UserCurriculumAssignment extends Model
             'status' => AssignmentStatus::class,
             'starts_at' => 'datetime',
             'ends_at' => 'datetime',
+            'cancelled_at' => 'datetime',
         ];
     }
 
@@ -47,7 +51,7 @@ class UserCurriculumAssignment extends Model
 
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(Subscriber::class, 'subscriber_id');
     }
 
     public function curriculum(): BelongsTo

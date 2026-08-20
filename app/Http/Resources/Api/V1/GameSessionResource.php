@@ -11,7 +11,7 @@ class GameSessionResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'user_id' => $this->user_id,
+            'subscriber_id' => $this->subscriber_id,
             'game_id' => $this->game_id,
             'game_name' => $this->game?->name,
             'game_code' => $this->game?->code,

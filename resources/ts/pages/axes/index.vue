@@ -22,6 +22,67 @@ const newSkill = ref({
 const isSubmitting = ref(false)
 const alertMessage = ref<string | null>(null)
 
+// Edit Axis State
+const editingAxisId = ref<string | null>(null)
+
+// Edit Skill State
+const editingSkillId = ref<string | null>(null)
+
+// Delete Axis State
+const confirmDeleteAxis = ref(false)
+const pendingDeleteAxis = ref<any | null>(null)
+const isDeletingAxis = ref(false)
+
+// Delete Skill State
+const confirmDeleteSkill = ref(false)
+const pendingDeleteSkill = ref<any | null>(null)
+const isDeletingSkill = ref(false)
+
+const openAddAxisDialog = () => {
+  editingAxisId.value = null
+  newAxis.value = { name: '', description: '', sort_order: axes.value.length + 1 }
+  isAddAxisDialogVisible.value = true
+}
+
+const openEditAxisDialog = (axis: any) => {
+  editingAxisId.value = axis.id
+  newAxis.value = {
+    name: axis.name,
+    description: axis.description || '',
+    sort_order: axis.sort_order || 1,
+  }
+  isAddAxisDialogVisible.value = true
+}
+
+const openAddSkillDialog = () => {
+  editingSkillId.value = null
+  newSkill.value = { axis_id: '', name: '', description: '', sort_order: 1 }
+  isAddSkillDialogVisible.value = true
+}
+
+const openEditSkillDialog = (skill: any) => {
+  editingSkillId.value = skill.id
+  newSkill.value = {
+    axis_id: skill.axis_id,
+    name: skill.name,
+    description: skill.description || '',
+    sort_order: skill.sort_order || 1,
+  }
+  isAddSkillDialogVisible.value = true
+}
+
+const requestDeleteAxis = (axis: any) => {
+  pendingDeleteAxis.value = axis
+  confirmDeleteAxis.value = true
+}
+
+const requestDeleteSkill = (skill: any) => {
+  pendingDeleteSkill.value = skill
+  confirmDeleteSkill.value = true
+}
+
+
+
 const fetchData = async () => {
   isLoading.value = true
   try {
@@ -46,8 +107,12 @@ const saveAxis = async () => {
     return
   isSubmitting.value = true
   try {
-    const res = await $api('/admin/axes', {
-      method: 'POST',
+    const isEdit = !!editingAxisId.value
+    const url = isEdit ? `/admin/axes/${editingAxisId.value}` : '/admin/axes'
+    const method = isEdit ? 'PUT' : 'POST'
+
+    const res = await $api(url, {
+      method,
       body: newAxis.value,
     })
     if (res?.success) {
@@ -69,8 +134,12 @@ const saveSkill = async () => {
     return
   isSubmitting.value = true
   try {
-    const res = await $api('/admin/skills', {
-      method: 'POST',
+    const isEdit = !!editingSkillId.value
+    const url = isEdit ? `/admin/skills/${editingSkillId.value}` : '/admin/skills'
+    const method = isEdit ? 'PUT' : 'POST'
+
+    const res = await $api(url, {
+      method,
       body: newSkill.value,
     })
     if (res?.success) {
@@ -87,17 +156,43 @@ const saveSkill = async () => {
   }
 }
 
-const deleteAxis = async (id: string) => {
-  if (!confirm('هل أنت متأكد من حذف هذا المحور وجميع المهارات المرتبطة به؟'))
-    return
+
+const deleteAxis = async () => {
+  if (!pendingDeleteAxis.value) return
+  isDeletingAxis.value = true
   try {
-    await $api(`/admin/axes/${id}`, { method: 'DELETE' })
+    await $api(`/admin/axes/${pendingDeleteAxis.value.id}`, { method: 'DELETE' })
     await fetchData()
   }
   catch (err) {
     console.error(err)
   }
+  finally {
+    isDeletingAxis.value = false
+    confirmDeleteAxis.value = false
+    pendingDeleteAxis.value = null
+  }
 }
+
+const deleteSkill = async () => {
+  if (!pendingDeleteSkill.value) return
+  isDeletingSkill.value = true
+  try {
+    await $api(`/admin/skills/${pendingDeleteSkill.value.id}`, { method: 'DELETE' })
+    await fetchData()
+  }
+  catch (err) {
+    console.error(err)
+  }
+  finally {
+    isDeletingSkill.value = false
+    confirmDeleteSkill.value = false
+    pendingDeleteSkill.value = null
+  }
+}
+
+
+
 
 onMounted(() => {
   fetchData()
@@ -121,14 +216,14 @@ onMounted(() => {
           color="secondary"
           variant="tonal"
           prepend-icon="tabler-plus"
-          @click="isAddSkillDialogVisible = true"
+          @click="openAddSkillDialog"
         >
           إضافة مهارة
         </VBtn>
         <VBtn
           color="primary"
           prepend-icon="tabler-plus"
-          @click="isAddAxisDialogVisible = true"
+          @click="openAddAxisDialog"
         >
           إضافة محور جديد
         </VBtn>
@@ -162,13 +257,22 @@ onMounted(() => {
               الرمز التعريفي: <code>{{ axis.slug }}</code>
             </VCardSubtitle>
             <template #append>
-              <VBtn
-                icon="tabler-trash"
-                size="small"
-                color="error"
-                variant="text"
-                @click="deleteAxis(axis.id)"
-              />
+              <div class="d-flex gap-1">
+                <VBtn
+                  icon="tabler-edit"
+                  size="small"
+                  color="warning"
+                  variant="text"
+                  @click="openEditAxisDialog(axis)"
+                />
+                <VBtn
+                  icon="tabler-trash"
+                  size="small"
+                  color="error"
+                  variant="text"
+                  @click="requestDeleteAxis(axis)"
+                />
+              </div>
             </template>
           </VCardItem>
 
@@ -196,6 +300,24 @@ onMounted(() => {
                 <VListItemSubtitle class="text-caption">
                   {{ skill.description }}
                 </VListItemSubtitle>
+                <template #append>
+                  <div class="d-flex gap-1">
+                    <VBtn
+                      icon="tabler-edit"
+                      size="x-small"
+                      color="warning"
+                      variant="text"
+                      @click="openEditSkillDialog(skill)"
+                    />
+                    <VBtn
+                      icon="tabler-trash"
+                      size="x-small"
+                      color="error"
+                      variant="text"
+                      @click="requestDeleteSkill(skill)"
+                    />
+                  </div>
+                </template>
               </VListItem>
 
               <div
@@ -214,10 +336,12 @@ onMounted(() => {
       <VProgressCircular indeterminate color="primary" size="48" />
     </div>
 
-    <!-- Add Axis Dialog -->
+    <!-- Add/Edit Axis Dialog -->
     <VDialog v-model="isAddAxisDialogVisible" max-width="500">
       <VCard>
-        <VCardTitle class="pa-4 font-weight-bold">إضافة محور تدريبي جديد</VCardTitle>
+        <VCardTitle class="pa-4 font-weight-bold">
+          {{ editingAxisId ? 'تعديل المحور التدريبي' : 'إضافة محور تدريبي جديد' }}
+        </VCardTitle>
         <VDivider />
         <VCardText class="pa-4">
           <VTextField
@@ -242,10 +366,12 @@ onMounted(() => {
       </VCard>
     </VDialog>
 
-    <!-- Add Skill Dialog -->
+    <!-- Add/Edit Skill Dialog -->
     <VDialog v-model="isAddSkillDialogVisible" max-width="500">
       <VCard>
-        <VCardTitle class="pa-4 font-weight-bold">إضافة مهارة جديدة</VCardTitle>
+        <VCardTitle class="pa-4 font-weight-bold">
+          {{ editingSkillId ? 'تعديل المهارة التدريبية' : 'إضافة مهارة جديدة' }}
+        </VCardTitle>
         <VDivider />
         <VCardText class="pa-4">
           <VSelect
@@ -277,5 +403,24 @@ onMounted(() => {
         </VCardActions>
       </VCard>
     </VDialog>
+    <!-- Confirm Delete Axis Modal -->
+    <ConfirmDeleteDialog
+      v-model="confirmDeleteAxis"
+      title="تأكيد حذف المحور التدريبي"
+      :item-name="pendingDeleteAxis?.name"
+      message="سيتم حذف هذا المحور التدريبي بشكل كامل مع جميع المهارات المرتبطة به. هل أنت متأكد؟"
+      :loading="isDeletingAxis"
+      @confirm="deleteAxis"
+    />
+
+    <!-- Confirm Delete Skill Modal -->
+    <ConfirmDeleteDialog
+      v-model="confirmDeleteSkill"
+      title="تأكيد حذف المهارة"
+      :item-name="pendingDeleteSkill?.name"
+      message="سيتم حذف هذه المهارة من المحور الحالي. هل أنت متأكد؟"
+      :loading="isDeletingSkill"
+      @confirm="deleteSkill"
+    />
   </div>
 </template>

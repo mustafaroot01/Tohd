@@ -9,10 +9,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ActivationCode extends Model
 {
-    use HasFactory, HasUuids;
+    use HasFactory, HasUuids, SoftDeletes;
 
     protected $fillable = [
         'code',
@@ -50,7 +51,7 @@ class ActivationCode extends Model
 
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'activated_by');
+        return $this->belongsTo(Subscriber::class, 'activated_by');
     }
 
     public function assignment(): HasOne

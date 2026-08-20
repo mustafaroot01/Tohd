@@ -1,12 +1,15 @@
 <?php
 
-use App\Http\Middleware\EnsureUserHasRole;
+use App\Http\Middleware\EnsureIsAdmin;
+use App\Http\Middleware\EnsureIsSubscriber;
 use App\Http\Middleware\ForceJsonResponse;
 use App\Support\ApiResponse;
 use Illuminate\Auth\AuthenticationException;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response;
@@ -20,10 +23,16 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
+    ->withSchedule(function (Schedule $schedule): void {
+        $schedule->command('app:expire-subscriptions')->daily();
+        $schedule->command('app:cleanup-expired-otps')->daily();
+    })
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'role' => EnsureUserHasRole::class,
+            'admin' => EnsureIsAdmin::class,
+            'subscriber' => EnsureIsSubscriber::class,
             'force.json' => ForceJsonResponse::class,
+            'maintenance' => \App\Http\Middleware\CheckMaintenanceMode::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
@@ -64,6 +73,16 @@ return Application::configure(basePath: dirname(__DIR__))
                     message: 'ليس لديك الصلاحية لتنفيذ هذا الإجراء',
                     errorCode: 'FORBIDDEN',
                     status: Response::HTTP_FORBIDDEN
+                );
+            }
+        });
+
+        $exceptions->render(function (ThrottleRequestsException $e, Request $request) {
+            if ($request->is('api/*') || $request->wantsJson()) {
+                return ApiResponse::error(
+                    message: 'عدد المحاولات كبير جداً، يرجى المحاولة لاحقاً',
+                    errorCode: 'TOO_MANY_REQUESTS',
+                    status: Response::HTTP_TOO_MANY_REQUESTS
                 );
             }
         });

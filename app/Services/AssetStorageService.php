@@ -56,6 +56,56 @@ class AssetStorageService
     }
 
     /**
+     * Update an existing asset and optionally replace its file.
+     */
+    public function updateAsset(Asset $asset, array $data, ?UploadedFile $file = null): Asset
+    {
+        $type = isset($data['type']) 
+            ? ($data['type'] instanceof AssetType ? $data['type'] : AssetType::from($data['type']))
+            : $asset->type;
+
+        $updateData = [
+            'name' => $data['name'] ?? $asset->name,
+            'code' => $data['code'] ?? $asset->code,
+            'type' => $type,
+        ];
+
+        if ($file) {
+            // Delete old file first
+            if (Storage::disk($asset->disk)->exists($asset->path)) {
+                Storage::disk($asset->disk)->delete($asset->path);
+            }
+
+            $directory = 'assets/'.strtolower($type->value).'/'.date('Y/m');
+            $metadata = $data['metadata'] ?? [];
+            $checksum = null;
+
+            if ($type === AssetType::LOTTIE) {
+                $lottieData = $this->lottieValidator->validateAndExtract($file);
+                $metadata = array_merge($metadata, $lottieData['metadata']);
+                $checksum = $lottieData['checksum'];
+            } else {
+                $checksum = hash_file('sha256', $file->getRealPath());
+            }
+
+            $extension = $file->getClientOriginalExtension() ?: ($type === AssetType::LOTTIE ? 'json' : 'bin');
+            $filename = Str::uuid().'.'.$extension;
+            $path = $file->storeAs($directory, $filename, $asset->disk);
+
+            $updateData['path'] = $path;
+            $updateData['mime_type'] = $file->getClientMimeType() ?: 'application/octet-stream';
+            $updateData['size'] = $file->getSize() ?: 0;
+            $updateData['checksum'] = $checksum;
+            $updateData['metadata'] = $metadata;
+            $updateData['version'] = $asset->version + 1;
+        }
+
+        $asset->update($updateData);
+
+        return $asset;
+    }
+
+    /**
      * Delete an asset and its file from storage.
      */
     public function deleteAsset(Asset $asset): bool

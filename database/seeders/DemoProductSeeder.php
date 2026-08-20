@@ -26,8 +26,7 @@ class DemoProductSeeder extends Seeder
                     'curriculum_id' => $curriculum->id,
                     'duration_days' => 30,
                     'status' => ProductStatus::ACTIVE,
-                    'price' => 199.00,
-                    'currency' => 'SAR',
+                    'price' => 50000.00,
                     'metadata' => [
                         'features' => [
                             'تدريب يومي مخصص للأطفال',

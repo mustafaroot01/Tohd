@@ -41,9 +41,4 @@ export default [
     to: 'users',
     icon: { icon: 'tabler-users' },
   },
-  {
-    title: 'تجربة التطبيق',
-    to: 'app-simulation',
-    icon: { icon: 'tabler-device-mobile-bolt' },
-  },
 ] as HorizontalNavItems

@@ -23,7 +23,7 @@ class GameController extends Controller
     public function index(Request $request): JsonResponse
     {
         $perPage = min((int) $request->input('per_page', 20), 100);
-        $query = Game::with(['axis', 'skill', 'assets'])->latest();
+        $query = Game::with(['axis', 'skill', 'gameLevel', 'assets'])->latest();
 
         if ($request->filled('status')) {
             $query->where('status', $request->input('status'));
@@ -79,7 +79,7 @@ class GameController extends Controller
 
     public function show(Game $game): JsonResponse
     {
-        $game->load(['axis', 'skill', 'assets', 'creator', 'updater']);
+        $game->load(['axis', 'skill', 'gameLevel', 'assets', 'creator', 'updater']);
 
         return ApiResponse::success(
             data: new AdminGameResource($game),

@@ -30,7 +30,7 @@ class HomeController extends Controller
 
         $progressSummary = $progressService->getOverallProgress($user);
 
-        $continueSession = GameSession::where('user_id', $user->id)
+        $continueSession = GameSession::where('subscriber_id', $user->id)
             ->where('status', GameSessionStatus::STARTED)
             ->with(['game.axis', 'game.skill', 'curriculumDay'])
             ->latest('started_at')

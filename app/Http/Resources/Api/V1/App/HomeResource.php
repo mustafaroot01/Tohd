@@ -4,7 +4,7 @@ namespace App\Http\Resources\Api\V1\App;
 
 use App\Http\Resources\Api\V1\ActivationCodeResource;
 use App\Http\Resources\Api\V1\GameSessionResource;
-use App\Http\Resources\Api\V1\UserResource;
+use App\Http\Resources\Api\V1\SubscriberResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -13,7 +13,7 @@ class HomeResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'user' => new UserResource($this->resource['user']),
+            'user' => new SubscriberResource($this->resource['user']),
             'activation' => $this->resource['activation'] ? new ActivationCodeResource($this->resource['activation']) : null,
             'assignment' => $this->resource['assignment'] ? [
                 'id' => $this->resource['assignment']->id,

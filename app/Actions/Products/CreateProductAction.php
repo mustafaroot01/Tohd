@@ -25,7 +25,6 @@ class CreateProductAction
             'duration_days' => $data['duration_days'] ?? 30,
             'status' => $data['status'] ?? ProductStatus::ACTIVE,
             'price' => $data['price'] ?? 0.00,
-            'currency' => $data['currency'] ?? 'SAR',
             'metadata' => $data['metadata'] ?? null,
         ]);
 

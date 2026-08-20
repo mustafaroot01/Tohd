@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 use App\Actions\Assets\UploadAssetAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Admin\UploadAssetRequest;
+use App\Http\Requests\Api\V1\Admin\UpdateAssetRequest;
 use App\Http\Resources\Api\V1\AssetResource;
 use App\Models\Asset;
 use App\Services\AssetStorageService;
@@ -68,6 +69,20 @@ class AssetController extends Controller
         );
     }
 
+    public function update(UpdateAssetRequest $request, Asset $asset, AssetStorageService $storageService): JsonResponse
+    {
+        $updated = $storageService->updateAsset(
+            asset: $asset,
+            data: $request->validated(),
+            file: $request->file('file')
+        );
+
+        return ApiResponse::success(
+            data: new AssetResource($updated),
+            message: 'تم تحديث بيانات الملف بنجاح'
+        );
+    }
+
     public function destroy(Asset $asset, AssetStorageService $storageService): JsonResponse
     {
         $storageService->deleteAsset($asset);
@@ -78,3 +93,4 @@ class AssetController extends Controller
         );
     }
 }
+

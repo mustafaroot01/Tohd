@@ -6,7 +6,9 @@ use App\Enums\GameStatus;
 use App\Enums\GameType;
 use App\Models\Axis;
 use App\Models\Game;
+use App\Models\Level;
 use App\Models\Skill;
+use App\Models\Subscriber;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -16,9 +18,10 @@ class AdminGameTest extends TestCase
     use RefreshDatabase;
 
     protected User $admin;
-    protected User $regularUser;
+    protected Subscriber $regularUser;
     protected Axis $axis;
     protected Skill $skill;
+    protected Level $level;
 
     protected function setUp(): void
     {
@@ -28,15 +31,13 @@ class AdminGameTest extends TestCase
             'name' => 'Admin User',
             'email' => 'admin@test.com',
             'password' => bcrypt('password'),
-            'role' => 'ADMIN',
             'status' => 'ACTIVE',
         ]);
 
-        $this->regularUser = User::create([
+        $this->regularUser = Subscriber::create([
             'name' => 'Regular User',
-            'email' => 'user@test.com',
+            'phone' => '+9647702222222',
             'password' => bcrypt('password'),
-            'role' => 'USER',
             'status' => 'ACTIVE',
         ]);
 
@@ -52,6 +53,13 @@ class AdminGameTest extends TestCase
             'slug' => 'selective-attention',
             'status' => 'ACTIVE',
         ]);
+
+        $this->level = Level::create([
+            'level_number' => 1,
+            'name' => 'المستوى الأول',
+            'min_age' => 3,
+            'max_age' => 8,
+        ]);
     }
 
     public function test_admin_can_create_and_publish_game(): void
@@ -66,7 +74,7 @@ class AdminGameTest extends TestCase
                 'type' => 'TAP',
                 'axis_id' => $this->axis->id,
                 'skill_id' => $this->skill->id,
-                'level' => 1,
+                'level_id' => $this->level->id,
                 'difficulty' => 'easy',
                 'duration_seconds' => 60,
                 'config' => [

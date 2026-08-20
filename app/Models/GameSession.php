@@ -14,7 +14,7 @@ class GameSession extends Model
     use HasFactory, HasUuids;
 
     protected $fillable = [
-        'user_id',
+        'subscriber_id',
         'game_id',
         'curriculum_day_id',
         'started_at',
@@ -57,7 +57,7 @@ class GameSession extends Model
 
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(Subscriber::class, 'subscriber_id');
     }
 
     public function game(): BelongsTo

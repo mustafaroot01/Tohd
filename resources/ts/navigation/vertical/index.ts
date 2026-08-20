@@ -18,6 +18,11 @@ export default [
     icon: { icon: 'tabler-target' },
   },
   {
+    title: 'مستويات الألعاب',
+    to: 'levels',
+    icon: { icon: 'tabler-award' },
+  },
+  {
     title: 'الألعاب التفاعلية',
     to: 'games',
     icon: { icon: 'tabler-device-gamepad-2' },
@@ -46,18 +51,24 @@ export default [
     icon: { icon: 'tabler-key' },
   },
   {
-    heading: 'المستخدمون والتجربة',
+    heading: 'المستخدمون',
   },
   {
-    title: 'المستخدمون والمشتركون',
+    title: 'مستخدمو النظام',
     to: 'users',
+    icon: { icon: 'tabler-user-shield' },
+  },
+  {
+    title: 'المشتركون',
+    to: 'subscribers',
     icon: { icon: 'tabler-users' },
   },
   {
-    title: 'تجربة التطبيق (Live App)',
-    to: 'app-simulation',
-    icon: { icon: 'tabler-device-mobile-bolt' },
-    badgeContent: 'مباشر',
-    badgeClass: 'bg-primary text-white',
+    heading: 'إعدادات النظام والتهيئة',
+  },
+  {
+    title: 'إعدادات النظام',
+    to: 'settings',
+    icon: { icon: 'tabler-settings-automation' },
   },
 ] as VerticalNavItems

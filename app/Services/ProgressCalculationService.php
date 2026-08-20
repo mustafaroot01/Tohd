@@ -6,7 +6,7 @@ use App\Enums\GameSessionStatus;
 use App\Models\Axis;
 use App\Models\GameSession;
 use App\Models\Skill;
-use App\Models\User;
+use App\Models\Subscriber;
 use App\Models\UserSkillProgress;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -16,9 +16,9 @@ class ProgressCalculationService
     /**
      * Calculate and return overall progress summary for a user.
      */
-    public function getOverallProgress(User $user): array
+    public function getOverallProgress(Subscriber $user): array
     {
-        $completedSessions = GameSession::where('user_id', $user->id)
+        $completedSessions = GameSession::where('subscriber_id', $user->id)
             ->where('status', GameSessionStatus::COMPLETED)
             ->with(['game.axis', 'game.skill'])
             ->get();
@@ -44,9 +44,9 @@ class ProgressCalculationService
     /**
      * Calculate skill-level breakdown and update the user_skill_progress cache table.
      */
-    public function updateSkillProgressForUser(User $user, Skill $skill): UserSkillProgress
+    public function updateSkillProgressForUser(Subscriber $user, Skill $skill): UserSkillProgress
     {
-        $sessions = GameSession::where('user_id', $user->id)
+        $sessions = GameSession::where('subscriber_id', $user->id)
             ->where('status', GameSessionStatus::COMPLETED)
             ->whereHas('game', fn ($q) => $q->where('skill_id', $skill->id))
             ->get();
@@ -59,7 +59,7 @@ class ProgressCalculationService
         $lastPlayedAt = $sessions->max('completed_at');
 
         return UserSkillProgress::updateOrCreate(
-            ['user_id' => $user->id, 'skill_id' => $skill->id],
+            ['subscriber_id' => $user->id, 'skill_id' => $skill->id],
             [
                 'games_completed' => $uniqueGames,
                 'total_sessions' => $totalSessions,
@@ -74,10 +74,10 @@ class ProgressCalculationService
     /**
      * Get axis-level progress breakdown.
      */
-    public function getAxisProgressBreakdown(User $user, ?Collection $completedSessions = null): array
+    public function getAxisProgressBreakdown(Subscriber $user, ?Collection $completedSessions = null): array
     {
         if (! $completedSessions) {
-            $completedSessions = GameSession::where('user_id', $user->id)
+            $completedSessions = GameSession::where('subscriber_id', $user->id)
                 ->where('status', GameSessionStatus::COMPLETED)
                 ->with(['game.axis'])
                 ->get();
@@ -104,10 +104,10 @@ class ProgressCalculationService
     /**
      * Get skill-level progress breakdown.
      */
-    public function getSkillProgressBreakdown(User $user, ?Collection $completedSessions = null): array
+    public function getSkillProgressBreakdown(Subscriber $user, ?Collection $completedSessions = null): array
     {
         if (! $completedSessions) {
-            $completedSessions = GameSession::where('user_id', $user->id)
+            $completedSessions = GameSession::where('subscriber_id', $user->id)
                 ->where('status', GameSessionStatus::COMPLETED)
                 ->with(['game.skill'])
                 ->get();
@@ -136,7 +136,7 @@ class ProgressCalculationService
     /**
      * Get periodic progress summary (Daily / Weekly / Monthly).
      */
-    public function getPeriodicProgress(User $user, string $period = 'daily'): array
+    public function getPeriodicProgress(Subscriber $user, string $period = 'daily'): array
     {
         $startDate = match ($period) {
             'daily' => Carbon::now()->startOfDay(),
@@ -145,7 +145,7 @@ class ProgressCalculationService
             default => Carbon::now()->startOfDay(),
         };
 
-        $sessions = GameSession::where('user_id', $user->id)
+        $sessions = GameSession::where('subscriber_id', $user->id)
             ->where('status', GameSessionStatus::COMPLETED)
             ->where('completed_at', '>=', $startDate)
             ->with(['game.axis', 'game.skill'])

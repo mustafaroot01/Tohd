@@ -6,6 +6,7 @@ use App\Http\Resources\Api\V1\AssetResource;
 use App\Http\Resources\Api\V1\AxisResource;
 use App\Http\Resources\Api\V1\SkillResource;
 use App\Http\Resources\Api\V1\UserResource;
+use App\Http\Resources\Api\V1\LevelResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -22,8 +23,10 @@ class AdminGameResource extends JsonResource
             'type' => $this->type?->value ?? (string) $this->type,
             'axis_id' => $this->axis_id,
             'skill_id' => $this->skill_id,
+            'level_id' => $this->level_id,
             'axis' => new AxisResource($this->whenLoaded('axis')),
             'skill' => new SkillResource($this->whenLoaded('skill')),
+            'game_level' => new LevelResource($this->whenLoaded('gameLevel')),
             'level' => $this->level,
             'difficulty' => $this->difficulty,
             'min_age' => $this->min_age,

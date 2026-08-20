@@ -9,12 +9,52 @@ const notification = ref<{ text: string; color: string } | null>(null)
 const confirmDelete = ref(false)
 const pendingDeleteAsset = ref<any | null>(null)
 
+// Preview File State
+const isPreviewDialogVisible = ref(false)
+const previewAssetUrl = ref('')
+const previewAssetName = ref('')
+const previewAssetType = ref('')
+
+const openPreview = (asset: any) => {
+  previewAssetUrl.value = asset.url
+  previewAssetName.value = asset.name
+  previewAssetType.value = asset.type
+  isPreviewDialogVisible.value = true
+}
+
+
+// Edit Asset State
+const editingAssetId = ref<string | null>(null)
+
 const newAsset = ref({
   code: '',
   name: '',
   type: 'LOTTIE',
   file: null as File | null,
 })
+
+const openAddAssetDialog = () => {
+  editingAssetId.value = null
+  newAsset.value = {
+    code: '',
+    name: '',
+    type: 'LOTTIE',
+    file: null,
+  }
+  isUploadDialogVisible.value = true
+}
+
+const openEditAssetDialog = (asset: any) => {
+  editingAssetId.value = asset.id
+  newAsset.value = {
+    code: asset.code,
+    name: asset.name,
+    type: asset.type,
+    file: null,
+  }
+  isUploadDialogVisible.value = true
+}
+
 
 const assetTypes = [
   { value: 'LOTTIE', title: 'رسوم Lottie المتحركة (JSON)' },
@@ -48,8 +88,10 @@ const handleFileUpload = (event: Event) => {
   }
 }
 
-const uploadAsset = async () => {
-  if (!newAsset.value.file) {
+const saveAsset = async () => {
+  const isEdit = !!editingAssetId.value
+
+  if (!isEdit && !newAsset.value.file) {
     notification.value = { text: 'يرجى اختيار ملف لرفعه', color: 'warning' }
     return
   }
@@ -57,14 +99,17 @@ const uploadAsset = async () => {
   isSubmitting.value = true
   try {
     const formData = new FormData()
-    formData.append('file', newAsset.value.file)
+    if (newAsset.value.file) {
+      formData.append('file', newAsset.value.file)
+    }
     formData.append('type', newAsset.value.type)
     if (newAsset.value.name)
       formData.append('name', newAsset.value.name)
     if (newAsset.value.code)
       formData.append('code', newAsset.value.code)
 
-    const res = await $api('/admin/assets', {
+    const url = isEdit ? `/admin/assets/${editingAssetId.value}` : '/admin/assets'
+    const res = await $api(url, {
       method: 'POST',
       body: formData,
     })
@@ -72,12 +117,15 @@ const uploadAsset = async () => {
     if (res?.success) {
       isUploadDialogVisible.value = false
       newAsset.value = { code: '', name: '', type: 'LOTTIE', file: null }
-      notification.value = { text: 'تم رفع وتدقيق الملف بنجاح!', color: 'success' }
+      notification.value = { 
+        text: isEdit ? 'تم تحديث بيانات الملف بنجاح!' : 'تم رفع وتدقيق الملف بنجاح!', 
+        color: 'success' 
+      }
       await fetchAssets()
     }
   }
   catch (err: any) {
-    notification.value = { text: err?.data?.message || 'فشل رفع الملف', color: 'error' }
+    notification.value = { text: err?.data?.message || 'فشل حفظ الملف', color: 'error' }
   }
   finally {
     isSubmitting.value = false
@@ -136,7 +184,7 @@ onMounted(() => {
       <VBtn
         color="primary"
         prepend-icon="tabler-upload"
-        @click="isUploadDialogVisible = true"
+        @click="openAddAssetDialog"
       >
         رفع ملف جديد
       </VBtn>
@@ -176,95 +224,125 @@ onMounted(() => {
       </VChip>
     </div>
 
-    <!-- Assets Grid -->
-    <VRow v-if="!isLoading">
-      <VCol
-        v-for="asset in assets"
-        :key="asset.id"
-        cols="12"
-        sm="6"
-        md="4"
-      >
-        <VCard class="h-100">
-          <VCardItem>
-            <template #prepend>
-              <VAvatar
-                :color="asset.type === 'LOTTIE' ? 'warning' : 'primary'"
-                variant="tonal"
-                rounded
-                size="44"
-              >
-                <VIcon :icon="asset.type === 'LOTTIE' ? 'tabler-animation' : 'tabler-photo'" size="24" />
-              </VAvatar>
-            </template>
-            <VCardTitle class="text-h6 font-weight-bold">
-              {{ asset.name }}
-            </VCardTitle>
-            <VCardSubtitle>
-              <code>{{ asset.code }}</code>
-            </VCardSubtitle>
-            <template #append>
-              <VBtn
-                icon="tabler-trash"
-                size="small"
-                color="error"
-                variant="text"
-                @click="confirmDeleteAsset(asset)"
-              />
-            </template>
-          </VCardItem>
+    <!-- Assets Table -->
+    <VCard v-if="!isLoading" class="mb-6">
+      <VCardText class="pa-0">
+        <VTable hover class="text-no-wrap">
+          <thead>
+            <tr>
+              <th class="text-start">كود الملف</th>
+              <th class="text-start">الاسم والملف</th>
+              <th class="text-start">النوع</th>
+              <th class="text-start">الحجم والتفاصيل</th>
+              <th class="text-center">المعاينة</th>
+              <th class="text-center">الإجراءات</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="asset in assets" :key="asset.id">
+              <!-- Code -->
+              <td>
+                <span class="font-weight-bold text-primary"><code>{{ asset.code }}</code></span>
+              </td>
+              
+              <!-- Name & Avatar -->
+              <td>
+                <div class="d-flex align-center gap-3">
+                  <VAvatar
+                    :color="asset.type === 'LOTTIE' ? 'warning' : 'primary'"
+                    variant="tonal"
+                    rounded
+                    size="38"
+                  >
+                    <VIcon :icon="asset.type === 'LOTTIE' ? 'tabler-animation' : 'tabler-photo'" size="20" />
+                  </VAvatar>
+                  <div>
+                    <div class="font-weight-bold">{{ asset.name }}</div>
+                    <div class="text-caption text-muted" style="max-width: 250px; overflow: hidden; text-overflow: ellipsis;">
+                      {{ asset.url ? asset.url.split('/').pop() : '' }}
+                    </div>
+                  </div>
+                </div>
+              </td>
 
-          <VCardText>
-            <div class="bg-background pa-3 rounded text-caption mb-3">
-              <div class="d-flex justify-space-between mb-1">
-                <span class="text-muted">النوع:</span>
-                <span class="font-weight-bold">{{ asset.type }}</span>
-              </div>
-              <div class="d-flex justify-space-between mb-1">
-                <span class="text-muted">الحجم:</span>
-                <span>{{ formatBytes(asset.size) }}</span>
-              </div>
-              <div class="d-flex justify-space-between mb-1" v-if="asset.metadata?.duration_seconds">
-                <span class="text-muted">مدة Lottie:</span>
-                <span>{{ asset.metadata.duration_seconds }} ثانية</span>
-              </div>
-              <div class="d-flex justify-space-between" v-if="asset.metadata?.total_frames">
-                <span class="text-muted">عدد الإطارات:</span>
-                <span>{{ asset.metadata.total_frames }} إطار</span>
-              </div>
-            </div>
+              <!-- Type -->
+              <td>
+                <VChip
+                  size="small"
+                  :color="asset.type === 'LOTTIE' ? 'warning' : asset.type === 'IMAGE' ? 'success' : asset.type === 'AUDIO' ? 'info' : 'secondary'"
+                  variant="tonal"
+                >
+                  {{ asset.type }}
+                </VChip>
+              </td>
 
-            <div class="d-flex gap-2">
-              <VBtn
-                v-if="asset.url"
-                size="small"
-                variant="tonal"
-                color="primary"
-                :href="asset.url"
-                target="_blank"
-                prepend-icon="tabler-download"
-                block
-              >
-                تحميل / معاينة الملف
-              </VBtn>
-            </div>
-          </VCardText>
-        </VCard>
-      </VCol>
+              <!-- Size & Metadata -->
+              <td>
+                <div>
+                  <div class="font-weight-medium text-caption">{{ formatBytes(asset.size) }}</div>
+                  <div v-if="asset.metadata?.duration_seconds || asset.metadata?.total_frames" class="text-caption text-muted">
+                    <span v-if="asset.metadata.duration_seconds">{{ asset.metadata.duration_seconds }}ث </span>
+                    <span v-if="asset.metadata.total_frames">({{ asset.metadata.total_frames }} إطار)</span>
+                  </div>
+                </div>
+              </td>
 
-      <VCol v-if="assets.length === 0" cols="12" class="text-center py-12 text-muted">
-        لا توجد وسائط مسجلة في هذا التصنيف
-      </VCol>
-    </VRow>
+              <!-- Preview -->
+              <td class="text-center">
+                <VBtn
+                  v-if="asset.url"
+                  size="small"
+                  variant="tonal"
+                  color="primary"
+                  prepend-icon="tabler-eye"
+                  @click="openPreview(asset)"
+                >
+                  معاينة
+                </VBtn>
+              </td>
+
+              <!-- Actions -->
+              <td class="text-center">
+                <div class="d-flex justify-center gap-1">
+                  <VBtn
+                    icon="tabler-edit"
+                    size="small"
+                    color="warning"
+                    variant="text"
+                    @click="openEditAssetDialog(asset)"
+                  />
+                  <VBtn
+                    icon="tabler-trash"
+                    size="small"
+                    color="error"
+                    variant="text"
+                    @click="confirmDeleteAsset(asset)"
+                  />
+                </div>
+              </td>
+            </tr>
+
+            <tr v-if="assets.length === 0">
+              <td colspan="6" class="text-center py-8 text-muted">
+                لا توجد وسائط مسجلة في هذا التصنيف.
+              </td>
+            </tr>
+          </tbody>
+        </VTable>
+      </VCardText>
+    </VCard>
 
     <div v-else class="text-center py-12">
       <VProgressCircular indeterminate color="primary" size="48" />
     </div>
 
-    <!-- Upload Dialog -->
+
+    <!-- Upload / Edit Dialog -->
     <VDialog v-model="isUploadDialogVisible" max-width="550">
       <VCard>
-        <VCardTitle class="pa-4 font-weight-bold">رفع وتدقيق ملف وسائط / Lottie</VCardTitle>
+        <VCardTitle class="pa-4 font-weight-bold">
+          {{ editingAssetId ? 'تعديل بيانات ملف الوسائط / Lottie' : 'رفع وتدقيق ملف وسائط / Lottie' }}
+        </VCardTitle>
         <VDivider />
         <VCardText class="pa-4">
           <VSelect
@@ -281,8 +359,15 @@ onMounted(() => {
             class="mb-4"
           />
 
+          <VTextField
+            v-model="newAsset.code"
+            label="كود الملف (فريد)"
+            placeholder="مثال: LOTTIE-GOLD-STAR"
+            class="mb-4"
+          />
+
           <VFileInput
-            label="اختر الملف من جهازك (JSON / MP3 / PNG / SVG)"
+            :label="editingAssetId ? 'اختر ملف جديد لاستبدال الملف الحالي (اختياري)' : 'اختر الملف من جهازك (JSON / MP3 / PNG / SVG)'"
             prepend-icon="tabler-file"
             @change="handleFileUpload"
             class="mb-2"
@@ -295,7 +380,9 @@ onMounted(() => {
         <VCardActions class="pa-4">
           <VSpacer />
           <VBtn variant="tonal" color="secondary" @click="isUploadDialogVisible = false">إلغاء</VBtn>
-          <VBtn color="primary" :loading="isSubmitting" @click="uploadAsset">بدء الرفع والتدقيق</VBtn>
+          <VBtn color="primary" :loading="isSubmitting" @click="saveAsset">
+            {{ editingAssetId ? 'حفظ التعديلات' : 'بدء الرفع والتدقيق' }}
+          </VBtn>
         </VCardActions>
       </VCard>
     </VDialog>
@@ -305,6 +392,14 @@ onMounted(() => {
       :item-name="pendingDeleteAsset?.name"
       :loading="isDeleting"
       @confirm="deleteAsset"
+    />
+
+    <!-- File Preview Modal -->
+    <FilePreviewDialog
+      v-model="isPreviewDialogVisible"
+      :file-url="previewAssetUrl"
+      :file-name="previewAssetName"
+      :file-type="previewAssetType"
     />
   </div>
 </template>

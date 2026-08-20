@@ -2,18 +2,18 @@
 
 namespace App\Http\Middleware;
 
-use App\Enums\UserRole;
+use App\Models\User;
 use App\Support\ApiResponse;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-class EnsureUserHasRole
+class EnsureIsAdmin
 {
     /**
      * Handle an incoming request.
      */
-    public function handle(Request $request, Closure $next, string ...$roles): Response
+    public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
 
@@ -25,20 +25,18 @@ class EnsureUserHasRole
             );
         }
 
-        if (! $user->isActive()) {
+        if (! $user instanceof User) {
             return ApiResponse::error(
-                message: 'تم تجميد أو إيقاف هذا الحساب، يرجى التواصل مع الإدارة',
-                errorCode: 'ACCOUNT_SUSPENDED',
+                message: 'ليس لديك الصلاحية الكافية للوصول إلى هذا الإجراء',
+                errorCode: 'FORBIDDEN',
                 status: Response::HTTP_FORBIDDEN
             );
         }
 
-        $userRoleValue = $user->role instanceof UserRole ? $user->role->value : (string) $user->role;
-
-        if (! in_array($userRoleValue, $roles, true)) {
+        if (! $user->isActive()) {
             return ApiResponse::error(
-                message: 'ليس لديك الصلاحية الكافية للوصول إلى هذا الإجراء',
-                errorCode: 'FORBIDDEN',
+                message: 'تم تجميد أو إيقاف هذا الحساب، يرجى التواصل مع الإدارة',
+                errorCode: 'ACCOUNT_SUSPENDED',
                 status: Response::HTTP_FORBIDDEN
             );
         }

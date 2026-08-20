@@ -111,5 +111,6 @@
         "borderStyle": "solid"
       }
     ]
-  }
+  },
+  "git.ignoreLimitWarning": true
 }

@@ -4,6 +4,7 @@ namespace App\Actions\Activations;
 
 use App\Enums\ActivationStatus;
 use App\Enums\AssignmentStatus;
+use App\Enums\SubscriberActivityType;
 use App\Events\ActivationRedeemed;
 use App\Exceptions\ActivationAlreadyUsedException;
 use App\Exceptions\ActivationExpiredException;
@@ -11,15 +12,17 @@ use App\Exceptions\CurriculumNotPublishedException;
 use App\Exceptions\InvalidActivationCodeException;
 use App\Exceptions\ProductInactiveException;
 use App\Models\ActivationCode;
-use App\Models\User;
+use App\Models\Subscriber;
 use App\Models\UserCurriculumAssignment;
 use App\Services\AuditLogService;
+use App\Services\SubscriberActivityLogger;
 use Illuminate\Support\Facades\DB;
 
 class RedeemActivationAction
 {
     public function __construct(
-        protected AuditLogService $auditLog
+        protected AuditLogService $auditLog,
+        protected SubscriberActivityLogger $activityLogger
     ) {}
 
     /**
@@ -31,7 +34,7 @@ class RedeemActivationAction
      * @throws ProductInactiveException
      * @throws CurriculumNotPublishedException
      */
-    public function execute(string $codeString, User $user): UserCurriculumAssignment
+    public function execute(string $codeString, Subscriber $user): UserCurriculumAssignment
     {
         $normalizedCode = strtoupper(trim($codeString));
 
@@ -80,7 +83,7 @@ class RedeemActivationAction
 
             // Create assignment
             $assignment = UserCurriculumAssignment::create([
-                'user_id' => $user->id,
+                'subscriber_id' => $user->id,
                 'curriculum_id' => $curriculum->id,
                 'activation_id' => $activation->id,
                 'starts_at' => $startsAt,
@@ -94,13 +97,22 @@ class RedeemActivationAction
                 $activation->id,
                 null,
                 [
-                    'user_id' => $user->id,
+                    'subscriber_id' => $user->id,
                     'product_id' => $product->id,
                     'curriculum_id' => $curriculum->id,
                     'assignment_id' => $assignment->id,
                 ],
-                $user
+                null
             );
+
+            $this->activityLogger->log($user, SubscriberActivityType::SERIAL_ACTIVATED, [
+                'activation_id' => $activation->id,
+                'code' => $activation->code,
+            ]);
+            $this->activityLogger->log($user, SubscriberActivityType::SUBSCRIPTION_STARTED, [
+                'assignment_id' => $assignment->id,
+                'curriculum_id' => $curriculum->id,
+            ]);
 
             event(new ActivationRedeemed($user, $activation, $product, $curriculum, $assignment));
 

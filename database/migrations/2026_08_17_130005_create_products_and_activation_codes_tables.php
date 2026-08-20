@@ -45,8 +45,8 @@ return new class extends Migration
             $table->foreignUuid('user_id')->constrained('users')->cascadeOnDelete();
             $table->foreignUuid('curriculum_id')->constrained('curriculums')->cascadeOnDelete();
             $table->foreignUuid('activation_id')->nullable()->constrained('activation_codes')->nullOnDelete();
-            $table->timestamp('starts_at')->index();
-            $table->timestamp('ends_at')->index();
+            $table->dateTime('starts_at')->index();
+            $table->dateTime('ends_at')->index();
             $table->string('status', 20)->default('ACTIVE')->index(); // ACTIVE, COMPLETED, EXPIRED, PAUSED
             $table->timestamps();
 

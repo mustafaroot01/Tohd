@@ -20,7 +20,10 @@ class CurriculumController extends Controller
             throw new NoActiveCurriculumException('لا يوجد منهج تدريبي مفعل لهذا الحساب');
         }
 
-        $curriculum = $assignment->curriculum()->with(['months.weeks.days.dayGames.game'])->firstOrFail();
+        $curriculum = $assignment->curriculum()->with([
+            'months.weeks.days.dayGames',
+            'months.weeks.days.games.assets',
+        ])->firstOrFail();
 
         return ApiResponse::success(
             data: new AppCurriculumResource($curriculum),

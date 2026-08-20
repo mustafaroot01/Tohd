@@ -7,6 +7,7 @@ use App\Enums\ProductStatus;
 use App\Models\ActivationCode;
 use App\Models\Curriculum;
 use App\Models\Product;
+use App\Models\Subscriber;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -15,7 +16,7 @@ class ActivationTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected User $user;
+    protected Subscriber $user;
     protected User $admin;
     protected Product $product;
     protected Curriculum $curriculum;
@@ -28,15 +29,13 @@ class ActivationTest extends TestCase
             'name' => 'Admin User',
             'email' => 'admin@test.com',
             'password' => bcrypt('password'),
-            'role' => 'ADMIN',
             'status' => 'ACTIVE',
         ]);
 
-        $this->user = User::create([
+        $this->user = Subscriber::create([
             'name' => 'App User',
-            'email' => 'user@test.com',
+            'phone' => '+9647701111111',
             'password' => bcrypt('password'),
-            'role' => 'USER',
             'status' => 'ACTIVE',
         ]);
 
@@ -99,7 +98,7 @@ class ActivationTest extends TestCase
         ]);
 
         $this->assertDatabaseHas('user_curriculum_assignments', [
-            'user_id' => $this->user->id,
+            'subscriber_id' => $this->user->id,
             'curriculum_id' => $this->curriculum->id,
             'status' => 'ACTIVE',
         ]);
@@ -111,7 +110,7 @@ class ActivationTest extends TestCase
             'code' => 'TEST-USED-1234-ABCD',
             'product_id' => $this->product->id,
             'status' => 'ACTIVATED',
-            'activated_by' => $this->admin->id,
+            'activated_by' => $this->user->id,
         ]);
 
         $userToken = $this->user->createToken('user')->plainTextToken;

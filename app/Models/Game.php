@@ -25,6 +25,7 @@ class Game extends Model
         'type',
         'axis_id',
         'skill_id',
+        'level_id',
         'level',
         'difficulty',
         'min_age',
@@ -71,6 +72,11 @@ class Game extends Model
     public function skill(): BelongsTo
     {
         return $this->belongsTo(Skill::class);
+    }
+
+    public function gameLevel(): BelongsTo
+    {
+        return $this->belongsTo(Level::class, 'level_id');
     }
 
     public function creator(): BelongsTo

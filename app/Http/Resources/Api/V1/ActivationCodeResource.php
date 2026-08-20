@@ -16,7 +16,7 @@ class ActivationCodeResource extends JsonResource
             'product' => new ProductResource($this->whenLoaded('product')),
             'status' => $this->status?->value ?? (string) $this->status,
             'activated_by' => $this->activated_by,
-            'activated_user' => new UserResource($this->whenLoaded('user')),
+            'activated_user' => new SubscriberResource($this->whenLoaded('user')),
             'activated_at' => $this->activated_at?->toISOString(),
             'expires_at' => $this->expires_at?->toISOString(),
             'created_at' => $this->created_at?->toISOString(),

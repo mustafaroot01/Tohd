@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\Admin\StoreLevelRequest;
+use App\Http\Requests\Api\V1\Admin\UpdateLevelRequest;
 use App\Http\Resources\Api\V1\LevelResource;
 use App\Models\Level;
 use App\Support\ApiResponse;
+use App\Support\TableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -14,47 +17,32 @@ class LevelController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $perPage = min((int) $request->input('per_page', 20), 100);
-        $query = Level::withCount('games')->orderBy('level_number');
+        $query = Level::withCount('games');
 
-        if ($request->filled('search')) {
-            $search = $request->input('search');
-            $query->where('name', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%");
-        }
+        TableQuery::search($query, $request, ['name', 'description']);
 
-        // Allow fetching all without pagination if requested
+        // Allow fetching all without pagination if requested (used by select inputs)
         if ($request->boolean('all')) {
             return ApiResponse::success(
-                data: LevelResource::collection($query->get()),
+                data: LevelResource::collection($query->orderBy('level_number')->get()),
                 message: 'تم استرجاع قائمة المستويات بنجاح'
             );
         }
 
-        $levels = $query->paginate($perPage);
+        TableQuery::sort($query, $request, ['name', 'level_number', 'min_age', 'max_age', 'created_at'], 'level_number', 'asc');
+
+        $levels = $query->paginate(TableQuery::perPage($request));
 
         return ApiResponse::success(
             data: LevelResource::collection($levels),
             message: 'تم استرجاع قائمة المستويات بنجاح',
-            meta: [
-                'current_page' => $levels->currentPage(),
-                'per_page' => $levels->perPage(),
-                'total' => $levels->total(),
-            ]
+            meta: TableQuery::meta($levels)
         );
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreLevelRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'level_number' => ['required', 'integer', 'unique:levels,level_number'],
-            'name' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'min_age' => ['required', 'integer', 'min:1'],
-            'max_age' => ['required', 'integer', 'min:1', 'gte:min_age'],
-        ]);
-
-        $level = Level::create($validated);
+        $level = Level::create($request->validated());
 
         return ApiResponse::success(
             data: new LevelResource($level),
@@ -71,17 +59,9 @@ class LevelController extends Controller
         );
     }
 
-    public function update(Request $request, Level $level): JsonResponse
+    public function update(UpdateLevelRequest $request, Level $level): JsonResponse
     {
-        $validated = $request->validate([
-            'level_number' => ['required', 'integer', 'unique:levels,level_number,' . $level->id],
-            'name' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'min_age' => ['required', 'integer', 'min:1'],
-            'max_age' => ['required', 'integer', 'min:1', 'gte:min_age'],
-        ]);
-
-        $level->update($validated);
+        $level->update($request->validated());
 
         return ApiResponse::success(
             data: new LevelResource($level),
@@ -92,7 +72,11 @@ class LevelController extends Controller
     public function destroy(Level $level): JsonResponse
     {
         if ($level->games()->exists()) {
-            return ApiResponse::error('لا يمكن حذف هذا المستوى لأنه مرتبط ببعض الألعاب حالياً.', Response::HTTP_UNPROCESSABLE_ENTITY);
+            return ApiResponse::error(
+                message: 'لا يمكن حذف هذا المستوى لأنه مرتبط ببعض الألعاب حالياً.',
+                errorCode: 'LEVEL_IN_USE',
+                status: Response::HTTP_UNPROCESSABLE_ENTITY
+            );
         }
 
         $level->delete();

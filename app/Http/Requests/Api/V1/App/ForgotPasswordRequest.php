@@ -17,11 +17,4 @@ class ForgotPasswordRequest extends FormRequest
             'phone' => ['required', 'string'],
         ];
     }
-
-    public function messages(): array
-    {
-        return [
-            'phone.required' => 'حقل رقم الهاتف مطلوب.',
-        ];
-    }
 }

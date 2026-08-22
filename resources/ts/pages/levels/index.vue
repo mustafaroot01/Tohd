@@ -1,13 +1,24 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import type { DataTableHeader } from '@/components/AppDataTableServer.vue'
 
-const levels = ref<any[]>([])
-const isLoading = ref(true)
+const headers: DataTableHeader[] = [
+  { title: 'المستوى', key: 'name', sortable: true, hideable: false },
+  { title: 'رقم المستوى', key: 'level_number', sortable: true, align: 'center' },
+  { title: 'الفئة العمرية', key: 'age_range' },
+  { title: 'الألعاب المرتبطة', key: 'games_count', align: 'center' },
+  { title: 'الوصف', key: 'description' },
+  { title: 'الإجراءات', key: 'actions', align: 'center', hideable: false },
+]
+
+const table = useServerTable('/admin/levels', {
+  defaultSort: 'level_number',
+  defaultOrder: 'asc',
+})
+
 const isAddLevelDialogVisible = ref(false)
 const isSubmitting = ref(false)
-const notification = ref<{ text: string; color: string } | null>(null)
+const { notification, notifySuccess, notifyWarning, notifyError } = useNotification()
 
-// Level Form State
 const editingLevelId = ref<string | null>(null)
 const levelForm = ref({
   level_number: 1,
@@ -17,7 +28,6 @@ const levelForm = ref({
   max_age: 8,
 })
 
-// Delete Level State
 const confirmDelete = ref(false)
 const pendingDeleteLevel = ref<any | null>(null)
 const isDeleting = ref(false)
@@ -25,7 +35,7 @@ const isDeleting = ref(false)
 const openAddLevelDialog = () => {
   editingLevelId.value = null
   levelForm.value = {
-    level_number: levels.value.length + 1,
+    level_number: table.total + 1,
     name: '',
     description: '',
     min_age: 3,
@@ -51,23 +61,10 @@ const requestDeleteLevel = (level: any) => {
   confirmDelete.value = true
 }
 
-const fetchLevels = async () => {
-  isLoading.value = true
-  try {
-    const res = await $api('/admin/levels')
-    if (res?.success) {
-      levels.value = res.data
-    }
-  } catch (err) {
-    console.error('Failed to load levels:', err)
-  } finally {
-    isLoading.value = false
-  }
-}
-
 const saveLevel = async () => {
   if (!levelForm.value.name || !levelForm.value.level_number) {
-    notification.value = { text: 'يرجى إدخال اسم المستوى ورقمه', color: 'warning' }
+    notifyWarning('يرجى إدخال اسم المستوى ورقمه')
+
     return
   }
 
@@ -77,167 +74,130 @@ const saveLevel = async () => {
     const url = isEdit ? `/admin/levels/${editingLevelId.value}` : '/admin/levels'
     const method = isEdit ? 'PUT' : 'POST'
 
-    const res = await $api(url, {
-      method,
-      body: levelForm.value,
-    })
+    const res = await $api(url, { method, body: levelForm.value })
 
     if (res?.success) {
       isAddLevelDialogVisible.value = false
-      notification.value = {
-        text: isEdit ? 'تم تحديث بيانات المستوى بنجاح' : 'تمت إضافة المستوى بنجاح',
-        color: 'success'
-      }
-      await fetchLevels()
+      notifySuccess(isEdit ? 'تم تحديث بيانات المستوى بنجاح' : 'تمت إضافة المستوى بنجاح')
+      await table.reload()
     }
-  } catch (err: any) {
-    notification.value = { text: err?.data?.message || 'فشل حفظ المستوى', color: 'error' }
-  } finally {
+  }
+  catch (err: any) {
+    notifyError(err, 'فشل حفظ المستوى')
+  }
+  finally {
     isSubmitting.value = false
   }
 }
 
 const deleteLevel = async () => {
-  if (!pendingDeleteLevel.value) return
+  if (!pendingDeleteLevel.value)
+    return
+
   isDeleting.value = true
   try {
-    const res = await $api(`/admin/levels/${pendingDeleteLevel.value.id}`, {
-      method: 'DELETE',
-    })
+    const res = await $api(`/admin/levels/${pendingDeleteLevel.value.id}`, { method: 'DELETE' })
     if (res?.success) {
-      notification.value = { text: 'تم حذف المستوى بنجاح', color: 'success' }
-      await fetchLevels()
+      notifySuccess('تم حذف المستوى بنجاح')
+      await table.afterDelete()
     }
-  } catch (err: any) {
-    notification.value = { text: err?.data?.message || 'فشل حذف المستوى', color: 'error' }
-  } finally {
+  }
+  catch (err: any) {
+    notifyError(err, 'فشل حذف المستوى')
+  }
+  finally {
     isDeleting.value = false
     confirmDelete.value = false
     pendingDeleteLevel.value = null
   }
 }
-
-onMounted(() => {
-  fetchLevels()
-})
 </script>
 
 <template>
   <div>
-    <!-- Header -->
-    <div class="d-flex justify-space-between align-center flex-wrap gap-4 mb-6">
-      <div>
-        <h2 class="text-h4 font-weight-bold">
-          مستويات الألعاب والأنشطة 🏆
-        </h2>
-        <p class="text-muted mb-0">
-          تهيئة وإدارة الفئات العمرية والمستويات التدريبية للألعاب
-        </p>
-      </div>
-      <VBtn
-        color="primary"
-        prepend-icon="tabler-plus"
-        @click="openAddLevelDialog"
-      >
-        إضافة مستوى جديد
-      </VBtn>
+    <div class="mb-6">
+      <h2 class="text-h4 font-weight-bold">
+        مستويات الألعاب والأنشطة 🏆
+      </h2>
+      <p class="text-muted mb-0">
+        تهيئة وإدارة الفئات العمرية والمستويات التدريبية للألعاب
+      </p>
     </div>
 
-    <!-- Notifications -->
-    <VAlert
-      v-if="notification"
-      :color="notification.color"
-      variant="tonal"
-      class="mb-6"
-      closable
-      @click:close="notification = null"
+    <AppNotification v-model="notification" />
+
+    <AppDataTableServer
+      :table="table"
+      :headers="headers"
+      title="المستويات"
+      icon="tabler-stairs-up"
+      search-placeholder="ابحث بالاسم أو الوصف…"
+      add-label="إضافة مستوى جديد"
+      empty-text="لا توجد مستويات معرفة بعد."
+      empty-icon="tabler-award-off"
+      @add="openAddLevelDialog"
     >
-      {{ notification.text }}
-    </VAlert>
+      <template #item.name="{ item }">
+        <div class="d-flex align-center gap-3">
+          <VAvatar color="primary" variant="tonal" size="38" class="font-weight-bold">
+            {{ item.level_number }}
+          </VAvatar>
+          <span class="font-weight-bold text-high-emphasis">{{ item.name }}</span>
+        </div>
+      </template>
 
-    <!-- Levels List -->
-    <VCard v-if="isLoading" class="text-center py-12">
-      <VProgressCircular indeterminate color="primary" size="48" />
-    </VCard>
+      <template #item.level_number="{ item }">
+        <span class="text-body-2">{{ item.level_number }}</span>
+      </template>
 
-    <VRow v-else-if="levels.length > 0">
-      <VCol
-        v-for="level in levels"
-        :key="level.id"
-        cols="12"
-        md="4"
-      >
-        <VCard class="h-100 d-flex flex-column">
-          <VCardText class="position-relative pa-6 flex-grow-1">
-            <!-- Level Number Badge -->
-            <VAvatar
-              color="primary"
-              variant="tonal"
-              size="48"
-              class="mb-4 font-weight-bold"
-            >
-              {{ level.level_number }}
-            </VAvatar>
+      <template #item.age_range="{ item }">
+        <span class="text-body-2">من {{ item.min_age }} إلى {{ item.max_age }} سنة</span>
+      </template>
 
-            <h3 class="text-h5 font-weight-bold mb-2">
-              {{ level.name }}
-            </h3>
+      <template #item.games_count="{ item }">
+        <VChip size="small" color="primary" variant="tonal" class="font-weight-medium">
+          {{ item.games_count ?? 0 }} لعبة
+        </VChip>
+      </template>
 
-            <p class="text-body-2 text-muted mb-4">
-              {{ level.description || 'لا يوجد وصف لهذا المستوى.' }}
-            </p>
+      <template #item.description="{ item }">
+        <span
+          v-if="item.description"
+          class="text-caption text-muted d-inline-block text-truncate"
+          style="max-inline-size: 20rem;"
+        >{{ item.description }}</span>
+        <span v-else class="text-muted text-caption">—</span>
+      </template>
 
-            <div class="d-flex gap-4 mb-2">
-              <div>
-                <span class="text-caption text-disabled d-block">الفئة العمرية</span>
-                <span class="text-body-2 font-weight-medium">من {{ level.min_age }} إلى {{ level.max_age }} سنة</span>
-              </div>
-              <VDivider vertical />
-              <div>
-                <span class="text-caption text-disabled d-block">الألعاب المرتبطة</span>
-                <VChip size="small" color="primary" class="font-weight-medium">
-                  {{ level.games_count }} لعبة
-                </VChip>
-              </div>
-            </div>
-          </VCardText>
-
-          <VDivider />
-
-          <!-- Card Actions -->
-          <VCardActions class="pa-4 bg-background">
-            <VBtn
-              color="warning"
-              variant="tonal"
-              size="small"
-              prepend-icon="tabler-edit"
-              @click="openEditLevelDialog(level)"
-            >
+      <template #item.actions="{ item }">
+        <div class="d-flex justify-center gap-1">
+          <VBtn
+            icon
+            size="small"
+            variant="text"
+            color="warning"
+            @click="openEditLevelDialog(item)"
+          >
+            <VIcon icon="tabler-edit" size="20" />
+            <VTooltip activator="parent" location="top">
               تعديل
-            </VBtn>
-
-            <VSpacer />
-
-            <VBtn
-              color="error"
-              variant="text"
-              size="small"
-              prepend-icon="tabler-trash"
-              @click="requestDeleteLevel(level)"
-            >
+            </VTooltip>
+          </VBtn>
+          <VBtn
+            icon
+            size="small"
+            variant="text"
+            color="error"
+            @click="requestDeleteLevel(item)"
+          >
+            <VIcon icon="tabler-trash" size="20" />
+            <VTooltip activator="parent" location="top">
               حذف
-            </VBtn>
-          </VCardActions>
-        </VCard>
-      </VCol>
-    </VRow>
-
-    <VCard v-else class="text-center py-12">
-      <VIcon icon="tabler-award-off" size="64" color="grey" class="mb-3" />
-      <h3 class="text-h5 text-muted mb-2">لا توجد مستويات معرفة</h3>
-      <p class="text-body-2 text-muted mb-4">اضغط على زر الإضافة لإنشاء مستوى تدريبي جديد</p>
-      <VBtn color="primary" @click="openAddLevelDialog">إنشاء أول مستوى</VBtn>
-    </VCard>
+            </VTooltip>
+          </VBtn>
+        </div>
+      </template>
+    </AppDataTableServer>
 
     <!-- Add/Edit Level Dialog -->
     <VDialog v-model="isAddLevelDialogVisible" max-width="550">
@@ -250,7 +210,6 @@ onMounted(() => {
 
         <VCardText class="pa-4">
           <VRow>
-            <!-- Level Number -->
             <VCol cols="12" sm="4">
               <AppTextField
                 v-model.number="levelForm.level_number"
@@ -261,7 +220,6 @@ onMounted(() => {
               />
             </VCol>
 
-            <!-- Level Name -->
             <VCol cols="12" sm="8">
               <AppTextField
                 v-model="levelForm.name"
@@ -270,7 +228,6 @@ onMounted(() => {
               />
             </VCol>
 
-            <!-- Description -->
             <VCol cols="12">
               <AppTextarea
                 v-model="levelForm.description"
@@ -280,7 +237,6 @@ onMounted(() => {
               />
             </VCol>
 
-            <!-- Min Age -->
             <VCol cols="12" sm="6">
               <AppTextField
                 v-model.number="levelForm.min_age"
@@ -290,7 +246,6 @@ onMounted(() => {
               />
             </VCol>
 
-            <!-- Max Age -->
             <VCol cols="12" sm="6">
               <AppTextField
                 v-model.number="levelForm.max_age"
@@ -304,25 +259,16 @@ onMounted(() => {
 
         <VCardActions class="pa-4">
           <VSpacer />
-          <VBtn
-            variant="tonal"
-            color="secondary"
-            @click="isAddLevelDialogVisible = false"
-          >
+          <VBtn variant="tonal" color="secondary" @click="isAddLevelDialogVisible = false">
             إلغاء
           </VBtn>
-          <VBtn
-            color="primary"
-            :loading="isSubmitting"
-            @click="saveLevel"
-          >
+          <VBtn color="primary" :loading="isSubmitting" @click="saveLevel">
             حفظ البيانات
           </VBtn>
         </VCardActions>
       </VCard>
     </VDialog>
 
-    <!-- Confirm Delete Modal -->
     <ConfirmDeleteDialog
       v-model="confirmDelete"
       title="تأكيد حذف المستوى"

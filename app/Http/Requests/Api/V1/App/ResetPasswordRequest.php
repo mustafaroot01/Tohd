@@ -19,14 +19,4 @@ class ResetPasswordRequest extends FormRequest
             'password' => ['required', 'string', 'min:8'],
         ];
     }
-
-    public function messages(): array
-    {
-        return [
-            'phone.required' => 'حقل رقم الهاتف مطلوب.',
-            'code.required' => 'حقل رمز التحقق مطلوب.',
-            'password.required' => 'حقل كلمة المرور مطلوب.',
-            'password.min' => 'يجب ألا تقل كلمة المرور عن 8 أحرف.',
-        ];
-    }
 }

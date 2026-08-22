@@ -19,13 +19,4 @@ class LoginRequest extends FormRequest
             'device_name' => ['nullable', 'string', 'max:100'],
         ];
     }
-
-    public function messages(): array
-    {
-        return [
-            'email.required' => 'حقل البريد الإلكتروني مطلوب.',
-            'email.email' => 'صيغة البريد الإلكتروني غير صحيحة.',
-            'password.required' => 'حقل كلمة المرور مطلوب.',
-        ];
-    }
 }

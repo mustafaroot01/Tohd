@@ -19,12 +19,4 @@ class LoginRequest extends FormRequest
             'device_name' => ['nullable', 'string', 'max:100'],
         ];
     }
-
-    public function messages(): array
-    {
-        return [
-            'phone.required' => 'حقل رقم الهاتف مطلوب.',
-            'password.required' => 'حقل كلمة المرور مطلوب.',
-        ];
-    }
 }

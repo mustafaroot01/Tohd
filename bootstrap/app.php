@@ -6,6 +6,7 @@ use App\Http\Middleware\ForceJsonResponse;
 use App\Support\ApiResponse;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -13,6 +14,7 @@ use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
@@ -34,6 +36,13 @@ return Application::configure(basePath: dirname(__DIR__))
             'force.json' => ForceJsonResponse::class,
             'maintenance' => \App\Http\Middleware\CheckMaintenanceMode::class,
         ]);
+
+        // This app has no `login` route, so the framework default
+        // redirectGuestsTo(route('login')) blew up with a RouteNotFoundException —
+        // returning a 500 debug page instead of a 401 for any client that did not
+        // send `Accept: application/json`. Returning null makes Authenticate throw
+        // AuthenticationException, which the renderer below turns into 401 JSON.
+        $middleware->redirectGuestsTo(fn () => null);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (ValidationException $e, Request $request) {
@@ -73,6 +82,28 @@ return Application::configure(basePath: dirname(__DIR__))
                     message: 'ليس لديك الصلاحية لتنفيذ هذا الإجراء',
                     errorCode: 'FORBIDDEN',
                     status: Response::HTTP_FORBIDDEN
+                );
+            }
+        });
+
+        $exceptions->render(function (MethodNotAllowedHttpException $e, Request $request) {
+            if ($request->is('api/*') || $request->wantsJson()) {
+                return ApiResponse::error(
+                    message: 'أسلوب الطلب غير مدعوم لهذا المسار',
+                    errorCode: 'METHOD_NOT_ALLOWED',
+                    status: Response::HTTP_METHOD_NOT_ALLOWED
+                );
+            }
+        });
+
+        $exceptions->render(function (QueryException $e, Request $request) {
+            if ($request->is('api/*') || $request->wantsJson()) {
+                report($e);
+
+                return ApiResponse::error(
+                    message: 'تعذّر تنفيذ العملية على قاعدة البيانات.',
+                    errorCode: 'DATABASE_ERROR',
+                    status: Response::HTTP_INTERNAL_SERVER_ERROR
                 );
             }
         });

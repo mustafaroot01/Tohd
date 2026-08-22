@@ -1,23 +1,29 @@
 <script setup lang="ts">
-const users = ref<any[]>([])
-const isLoading = ref(true)
+import type { DataTableHeader } from '@/components/AppDataTableServer.vue'
+
+const headers: DataTableHeader[] = [
+  { title: 'المستخدم', key: 'name', sortable: true, hideable: false },
+  { title: 'البريد الإلكتروني', key: 'email', sortable: true },
+  {
+    title: 'حالة الحساب',
+    key: 'status',
+    sortable: true,
+    filter: { options: statusOptions(USER_STATUS) },
+  },
+  { title: 'آخر دخول', key: 'last_login_at', sortable: true },
+  { title: 'تاريخ التسجيل', key: 'created_at', sortable: true },
+  { title: 'التفاصيل', key: 'actions', align: 'center', hideable: false },
+]
+
+const table = useServerTable('/admin/users', {
+  defaultSort: 'created_at',
+  defaultOrder: 'desc',
+  filters: { status: null },
+})
+
 const selectedUser = ref<any | null>(null)
 const isDetailsDialogVisible = ref(false)
 
-const fetchUsers = async () => {
-  isLoading.value = true
-  try {
-    const res = await $api('/admin/users')
-    if (res?.success)
-      users.value = res.data
-  }
-  catch (err) {
-    console.error(err)
-  }
-  finally {
-    isLoading.value = false
-  }
-}
 
 const showUserDetails = async (user: any) => {
   try {
@@ -31,93 +37,80 @@ const showUserDetails = async (user: any) => {
     console.error(err)
   }
 }
-
-onMounted(() => {
-  fetchUsers()
-})
 </script>
 
 <template>
   <div>
-    <!-- Header -->
-    <div class="d-flex justify-space-between align-center flex-wrap gap-4 mb-6">
-      <div>
-        <h2 class="text-h4 font-weight-bold">
-          مستخدمو النظام 🛡️
-        </h2>
-        <p class="text-muted mb-0">
-          استعراض حسابات مدراء لوحة التحكم الذين يديرون المنصة
-        </p>
-      </div>
+    <div class="mb-6">
+      <h2 class="text-h4 font-weight-bold">
+        مستخدمو النظام 🛡️
+      </h2>
+      <p class="text-muted mb-0">
+        استعراض حسابات مدراء لوحة التحكم الذين يديرون المنصة
+      </p>
     </div>
 
-    <!-- Users Table Card -->
-    <VCard>
-      <VCardText class="pa-0">
-        <VTable hover class="text-no-wrap">
-          <thead>
-            <tr>
-              <th class="text-start">المستخدم</th>
-              <th class="text-start">البريد الإلكتروني</th>
-              <th class="text-start">حالة الحساب</th>
-              <th class="text-start">تاريخ التسجيل</th>
-              <th class="text-center">التفاصيل</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="user in users" :key="user.id">
-              <td>
-                <div class="d-flex align-center gap-3">
-                  <VAvatar color="primary" variant="tonal" size="38">
-                    <VIcon icon="tabler-user" size="20" />
-                  </VAvatar>
-                  <div>
-                    <div class="font-weight-bold">{{ user.name }}</div>
-                  </div>
-                </div>
-              </td>
-              <td>{{ user.email }}</td>
-              <td>
-                <VChip
-                  size="small"
-                  :color="user.status === 'ACTIVE' ? 'success' : 'secondary'"
-                  variant="tonal"
-                >
-                  {{ user.status === 'ACTIVE' ? 'نشط' : 'معطل' }}
-                </VChip>
-              </td>
-              <td>
-                <span class="text-caption">
-                  {{ user.created_at ? new Date(user.created_at).toLocaleDateString('ar-SA') : '-' }}
-                </span>
-              </td>
-              <td class="text-center">
-                <VBtn
-                  size="small"
-                  variant="tonal"
-                  color="primary"
-                  prepend-icon="tabler-eye"
-                  @click="showUserDetails(user)"
-                >
-                  استعراض
-                </VBtn>
-              </td>
-            </tr>
+    <AppDataTableServer
+      :table="table"
+      :headers="headers"
+      title="قائمة المدراء"
+      icon="tabler-shield-lock"
+      search-placeholder="ابحث بالاسم أو البريد…"
+      empty-text="لا يوجد مستخدمو نظام مسجلون بعد."
+      empty-icon="tabler-user-off"
+    >
+      <template #item.name="{ item }">
+        <div class="d-flex align-center gap-3">
+          <VAvatar color="primary" variant="tonal" size="38">
+            <VIcon icon="tabler-user" size="20" />
+          </VAvatar>
+          <span class="font-weight-bold text-high-emphasis">{{ item.name }}</span>
+        </div>
+      </template>
 
-            <tr v-if="users.length === 0 && !isLoading">
-              <td colspan="5" class="text-center py-8 text-muted">
-                لا يوجد مستخدمو نظام مسجلون بعد.
-              </td>
-            </tr>
-          </tbody>
-        </VTable>
-      </VCardText>
-    </VCard>
+      <template #item.email="{ item }">
+        <span class="text-body-2">{{ item.email }}</span>
+      </template>
+
+      <template #item.status="{ item }">
+        <VChip
+          size="small"
+          :color="statusColor(USER_STATUS, item.status)"
+          variant="tonal"
+        >
+          {{ statusLabel(USER_STATUS, item.status) }}
+        </VChip>
+      </template>
+
+      <template #item.last_login_at="{ item }">
+        <span class="text-caption">{{ formatDate(item.last_login_at) }}</span>
+      </template>
+
+      <template #item.created_at="{ item }">
+        <span class="text-caption">{{ formatDate(item.created_at) }}</span>
+      </template>
+
+      <template #item.actions="{ item }">
+        <div class="text-center">
+          <VBtn
+            size="small"
+            variant="tonal"
+            color="primary"
+            prepend-icon="tabler-eye"
+            @click="showUserDetails(item)"
+          >
+            استعراض
+          </VBtn>
+        </div>
+      </template>
+    </AppDataTableServer>
 
     <!-- User Details Dialog -->
     <VDialog v-model="isDetailsDialogVisible" max-width="500">
       <VCard v-if="selectedUser">
-        <VCardTitle class="pa-4 font-weight-bold">بيانات المستخدم</VCardTitle>
+        <VCardTitle class="pa-4 font-weight-bold">
+          بيانات المستخدم
+        </VCardTitle>
         <VDivider />
         <VCardText class="pa-4">
           <div class="d-flex align-center gap-3 mb-4">
@@ -125,8 +118,12 @@ onMounted(() => {
               <VIcon icon="tabler-user" size="28" />
             </VAvatar>
             <div>
-              <h3 class="text-h6 font-weight-bold">{{ selectedUser.name }}</h3>
-              <p class="text-caption text-muted mb-0">{{ selectedUser.email }}</p>
+              <h3 class="text-h6 font-weight-bold">
+                {{ selectedUser.name }}
+              </h3>
+              <p class="text-caption text-muted mb-0">
+                {{ selectedUser.email }}
+              </p>
             </div>
           </div>
 
@@ -139,13 +136,15 @@ onMounted(() => {
             </div>
             <div class="d-flex justify-space-between">
               <span class="text-muted">تاريخ الانضمام:</span>
-              <span>{{ new Date(selectedUser.created_at).toLocaleDateString('ar-SA') }}</span>
+              <span>{{ formatDate(selectedUser.created_at) }}</span>
             </div>
           </div>
         </VCardText>
         <VCardActions class="pa-4">
           <VSpacer />
-          <VBtn color="primary" @click="isDetailsDialogVisible = false">إغلاق</VBtn>
+          <VBtn color="primary" @click="isDetailsDialogVisible = false">
+            إغلاق
+          </VBtn>
         </VCardActions>
       </VCard>
     </VDialog>

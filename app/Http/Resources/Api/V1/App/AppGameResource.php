@@ -3,11 +3,14 @@
 namespace App\Http\Resources\Api\V1\App;
 
 use App\Http\Resources\Api\V1\AssetResource;
+use App\Http\Resources\Concerns\SerializesEnums;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class AppGameResource extends JsonResource
 {
+    use SerializesEnums;
+
     public function toArray(Request $request): array
     {
         return [
@@ -15,7 +18,7 @@ class AppGameResource extends JsonResource
             'code' => $this->code,
             'name' => $this->name,
             'description' => $this->description,
-            'type' => $this->type?->value ?? (string) $this->type,
+            'type' => $this->enumValue($this->type),
             'level' => $this->level,
             'difficulty' => $this->difficulty,
             'duration_seconds' => $this->duration_seconds,

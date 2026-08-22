@@ -8,6 +8,7 @@ use App\Http\Requests\Api\V1\Admin\UpdateAxisRequest;
 use App\Http\Resources\Api\V1\AxisResource;
 use App\Models\Axis;
 use App\Support\ApiResponse;
+use App\Support\TableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -17,24 +18,20 @@ class AxisController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $perPage = min((int) $request->input('per_page', 20), 100);
-        $query = Axis::withCount('skills')->orderBy('sort_order');
+        $query = Axis::withCount('skills');
 
-        if ($request->filled('search')) {
-            $search = $request->input('search');
-            $query->where('name', 'like', "%{$search}%")->orWhere('slug', 'like', "%{$search}%");
-        }
+        TableQuery::filters($query, $request, ['status']);
 
-        $axes = $query->paginate($perPage);
+        TableQuery::search($query, $request, ['name', 'slug']);
+
+        TableQuery::sort($query, $request, ['name', 'slug', 'status', 'sort_order', 'created_at'], 'sort_order', 'asc');
+
+        $axes = $query->paginate(TableQuery::perPage($request));
 
         return ApiResponse::success(
             data: AxisResource::collection($axes),
             message: 'تم استرجاع قائمة المحاور بنجاح',
-            meta: [
-                'current_page' => $axes->currentPage(),
-                'per_page' => $axes->perPage(),
-                'total' => $axes->total(),
-            ]
+            meta: TableQuery::meta($axes)
         );
     }
 

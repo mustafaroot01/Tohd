@@ -12,6 +12,7 @@ use App\Http\Resources\Api\V1\SubscriberResource;
 use App\Services\SubscriberActivityLogger;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
+use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
@@ -30,7 +31,18 @@ class ProfileController extends Controller
         $user = $request->user();
         $data = $request->validated();
 
+        $currentPassword = $data['current_password'] ?? null;
+        unset($data['current_password']);
+
         if (isset($data['password'])) {
+            if (! $currentPassword || ! Hash::check($currentPassword, $user->password)) {
+                return ApiResponse::error(
+                    message: 'كلمة المرور الحالية غير صحيحة',
+                    errorCode: 'INVALID_CURRENT_PASSWORD',
+                    status: Response::HTTP_UNPROCESSABLE_ENTITY
+                );
+            }
+
             $data['password'] = Hash::make($data['password']);
         }
 

@@ -1,12 +1,10 @@
 <script setup lang="ts">
-const products = ref<any[]>([])
+import type { DataTableHeader } from '@/components/AppDataTableServer.vue'
+
 const curriculums = ref<any[]>([])
-const isLoading = ref(true)
 const isAddProductDialogVisible = ref(false)
 const isSubmitting = ref(false)
-const notification = ref<{ text: string; color: string } | null>(null)
-
-// Edit Product State
+const { notification, notifySuccess, notifyInfo, notifyError } = useNotification()
 const editingProductId = ref<string | null>(null)
 
 const newProduct = ref({
@@ -18,8 +16,38 @@ const newProduct = ref({
   price: 25000,
 })
 
+const table = useServerTable('/admin/products', {
+  defaultSort: 'created_at',
+  defaultOrder: 'desc',
+  filters: { status: null, curriculum_id: null },
+})
+
+const headers = computed<DataTableHeader[]>(() => [
+  { title: 'الباقة', key: 'name', sortable: true, hideable: false },
+  { title: 'الكود', key: 'code', sortable: true },
+  { title: 'السعر', key: 'price', sortable: true, align: 'start' },
+  { title: 'المدة', key: 'duration_days', sortable: true },
+  {
+    title: 'المنهج المرتبط',
+    key: 'curriculum_name',
+    filter: {
+      key: 'curriculum_id',
+      anyLabel: 'كل المناهج',
+      options: curriculums.value.map(c => ({ title: c.name, value: c.id })),
+    },
+  },
+  {
+    title: 'الحالة',
+    key: 'status',
+    sortable: true,
+    filter: { options: statusOptions(PRODUCT_STATUS) },
+  },
+  { title: 'الإجراءات', key: 'actions', align: 'center', hideable: false },
+])
+
 const generateProductCode = () => {
   const random = Array.from({ length: 6 }, () => '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 36)]).join('')
+
   return `PROD-${random}`
 }
 
@@ -36,7 +64,6 @@ const openAddProductDialog = () => {
   isAddProductDialogVisible.value = true
 }
 
-
 const openEditProductDialog = (prod: any) => {
   editingProductId.value = prod.id
   newProduct.value = {
@@ -50,24 +77,14 @@ const openEditProductDialog = (prod: any) => {
   isAddProductDialogVisible.value = true
 }
 
-
-
-const fetchProducts = async () => {
-  isLoading.value = true
+const fetchCurriculums = async () => {
   try {
-    const res = await $api('/admin/products')
+    const res = await $api('/admin/curriculums', { query: { per_page: 100 } })
     if (res?.success)
-      products.value = res.data
-
-    const currRes = await $api('/admin/curriculums')
-    if (currRes?.success)
-      curriculums.value = currRes.data
+      curriculums.value = res.data
   }
   catch (err) {
     console.error(err)
-  }
-  finally {
-    isLoading.value = false
   }
 }
 
@@ -81,36 +98,32 @@ const saveProduct = async () => {
     const url = isEdit ? `/admin/products/${editingProductId.value}` : '/admin/products'
     const method = isEdit ? 'PUT' : 'POST'
 
-    const res = await $api(url, {
-      method,
-      body: newProduct.value,
-    })
+    const res = await $api(url, { method, body: newProduct.value })
+
     if (res?.success) {
       isAddProductDialogVisible.value = false
-      newProduct.value = { code: '', name: '', description: '', curriculum_id: '', duration_days: 30, price: 25000 }
-      notification.value = { 
-        text: isEdit ? 'تم تحديث بيانات الباقة بنجاح!' : 'تمت إضافة الباقة بنجاح!', 
-        color: 'success' 
-      }
-      await fetchProducts()
+      notifySuccess(isEdit ? 'تم تحديث بيانات الباقة بنجاح!' : 'تمت إضافة الباقة بنجاح!')
+      await table.reload()
     }
   }
   catch (err: any) {
-    notification.value = { text: err?.data?.message || 'فشل حفظ الباقة', color: 'error' }
+    notifyError(err, 'فشل حفظ الباقة')
   }
   finally {
     isSubmitting.value = false
   }
 }
 
-
 const toggleStatus = async (product: any) => {
   try {
-    const endpoint = product.status === 'ACTIVE' ? `/admin/products/${product.id}/deactivate` : `/admin/products/${product.id}/activate`
+    const endpoint = product.status === 'ACTIVE'
+      ? `/admin/products/${product.id}/deactivate`
+      : `/admin/products/${product.id}/activate`
+
     const res = await $api(endpoint, { method: 'POST' })
     if (res?.success) {
-      notification.value = { text: 'تم تحديث حالة الباقة بنجاح', color: 'info' }
-      await fetchProducts()
+      notifyInfo('تم تحديث حالة الباقة بنجاح')
+      await table.reload()
     }
   }
   catch (err) {
@@ -118,126 +131,103 @@ const toggleStatus = async (product: any) => {
   }
 }
 
-onMounted(() => {
-  fetchProducts()
-})
+onMounted(fetchCurriculums)
 </script>
 
 <template>
   <div>
-    <!-- Header -->
-    <div class="d-flex justify-space-between align-center flex-wrap gap-4 mb-6">
-      <div>
-        <h2 class="text-h4 font-weight-bold">
-          الباقات والمنتجات التدريبية 📦
-        </h2>
-        <p class="text-muted mb-0">
-          إدارة باقات الاشتراك، مدة الصلاحية بالأيام، وربطها بالمناهج التدريبية
-        </p>
-      </div>
-      <VBtn
-        color="primary"
-        prepend-icon="tabler-plus"
-        @click="openAddProductDialog"
-      >
-        إضافة باقة جديدة
-      </VBtn>
+    <div class="mb-6">
+      <h2 class="text-h4 font-weight-bold">
+        الباقات والمنتجات التدريبية 📦
+      </h2>
+      <p class="text-muted mb-0">
+        إدارة باقات الاشتراك، مدة الصلاحية بالأيام، وربطها بالمناهج التدريبية
+      </p>
     </div>
 
-    <!-- Notification -->
-    <VAlert
-      v-if="notification"
-      :color="notification.color"
-      variant="tonal"
-      class="mb-6"
-      closable
-      @click:close="notification = null"
+    <AppNotification v-model="notification" />
+
+    <AppDataTableServer
+      :table="table"
+      :headers="headers"
+      title="الباقات"
+      icon="tabler-package"
+      search-placeholder="ابحث بالاسم أو الكود…"
+      add-label="إضافة باقة جديدة"
+      empty-text="لا توجد باقات مضافة بعد."
+      empty-icon="tabler-package-off"
+      @add="openAddProductDialog"
     >
-      {{ notification.text }}
-    </VAlert>
+      <template #item.name="{ item }">
+        <div>
+          <div class="font-weight-bold text-high-emphasis">
+            {{ item.name }}
+          </div>
+          <div v-if="item.description" class="text-caption text-muted text-truncate" style="max-inline-size: 20rem;">
+            {{ item.description }}
+          </div>
+        </div>
+      </template>
 
-    <!-- Products Grid -->
-    <VRow v-if="!isLoading">
-      <VCol
-        v-for="prod in products"
-        :key="prod.id"
-        cols="12"
-        md="6"
-        lg="4"
-      >
-        <VCard class="h-100">
-          <VCardItem>
-            <template #prepend>
-              <VAvatar color="primary" variant="tonal" rounded size="48">
-                <VIcon icon="tabler-package" size="28" />
-              </VAvatar>
-            </template>
-            <VCardTitle class="font-weight-bold">
-              {{ prod.name }}
-            </VCardTitle>
-            <VCardSubtitle>
-              <code>{{ prod.code }}</code>
-            </VCardSubtitle>
-            <template #append>
-              <VChip
-                size="small"
-                :color="prod.status === 'ACTIVE' ? 'success' : 'secondary'"
-                variant="tonal"
-              >
-                {{ prod.status === 'ACTIVE' ? 'نشطة' : 'غير نشطة' }}
-              </VChip>
-            </template>
-          </VCardItem>
+      <template #item.code="{ item }">
+        <span dir="ltr" class="text-caption font-weight-medium">{{ item.code }}</span>
+      </template>
 
-          <VCardText>
-            <div class="d-flex align-center gap-2 mb-4">
-              <span class="text-h4 font-weight-bold text-primary">{{ Number(prod.price).toLocaleString() }}</span>
-              <span class="text-subtitle-1 text-muted">{{ prod.currency === 'IQD' ? 'دينار عراقي' : prod.currency }}</span>
-              <VChip size="small" color="info" variant="tonal" class="ms-auto">
-                {{ prod.duration_days }} يوماً
-              </VChip>
-            </div>
+      <template #item.price="{ item }">
+        <span class="font-weight-bold text-primary">{{ formatNumber(item.price) }}</span>
+        <span class="text-caption text-muted ms-1">{{ item.currency === 'IQD' ? 'د.ع' : item.currency }}</span>
+      </template>
 
-            <p class="text-body-2 text-muted mb-4">
-              {{ prod.description || 'لا يوجد وصف تفصيلي للباقة' }}
-            </p>
+      <template #item.duration_days="{ item }">
+        <VChip size="small" color="info" variant="tonal">
+          {{ item.duration_days }} يوماً
+        </VChip>
+      </template>
 
-            <div class="bg-background pa-3 rounded text-caption mb-4">
-              <div class="d-flex justify-space-between mb-1">
-                <span class="text-muted">المنهج المرتبط:</span>
-                <span class="font-weight-bold">{{ prod.curriculum_name || 'غير مرتبط' }}</span>
-              </div>
-            </div>
+      <template #item.curriculum_name="{ item }">
+        <span v-if="item.curriculum_name" class="text-body-2">{{ item.curriculum_name }}</span>
+        <span v-else class="text-muted text-caption">غير مرتبط</span>
+      </template>
 
-            <div class="d-flex gap-2">
-              <VBtn
-                size="small"
-                variant="flat"
-                color="warning"
-                class="flex-grow-1"
-                prepend-icon="tabler-edit"
-                @click="openEditProductDialog(prod)"
-              >
-                تعديل
-              </VBtn>
-              <VBtn
-                size="small"
-                variant="tonal"
-                :color="prod.status === 'ACTIVE' ? 'warning' : 'success'"
-                class="flex-grow-1"
-                @click="toggleStatus(prod)"
-              >
-                {{ prod.status === 'ACTIVE' ? 'إيقاف الباقة' : 'تفعيل الباقة' }}
-              </VBtn>
-            </div>
-          </VCardText>
-        </VCard>
-      </VCol>
-    </VRow>
+      <template #item.status="{ item }">
+        <VChip
+          size="small"
+          :color="statusColor(PRODUCT_STATUS, item.status)"
+          variant="tonal"
+        >
+          {{ statusLabel(PRODUCT_STATUS, item.status) }}
+        </VChip>
+      </template>
 
-    <div v-else class="text-center py-12">
-      <VProgressCircular indeterminate color="primary" size="48" />
-    </div>
+      <template #item.actions="{ item }">
+        <div class="d-flex justify-center gap-1">
+          <VBtn
+            icon
+            size="small"
+            variant="text"
+            color="warning"
+            @click="openEditProductDialog(item)"
+          >
+            <VIcon icon="tabler-edit" size="20" />
+            <VTooltip activator="parent" location="top">
+              تعديل
+            </VTooltip>
+          </VBtn>
+          <VBtn
+            icon
+            size="small"
+            variant="text"
+            :color="item.status === 'ACTIVE' ? 'warning' : 'success'"
+            @click="toggleStatus(item)"
+          >
+            <VIcon :icon="item.status === 'ACTIVE' ? 'tabler-player-pause' : 'tabler-player-play'" size="20" />
+            <VTooltip activator="parent" location="top">
+              {{ item.status === 'ACTIVE' ? 'إيقاف الباقة' : 'تفعيل الباقة' }}
+            </VTooltip>
+          </VBtn>
+        </div>
+      </template>
+    </AppDataTableServer>
 
     <!-- Create/Edit Product Dialog -->
     <VDialog v-model="isAddProductDialogVisible" max-width="550">
@@ -249,7 +239,7 @@ onMounted(() => {
         <VCardText class="pa-4">
           <VRow>
             <VCol cols="12" sm="6">
-              <VTextField
+              <AppTextField
                 v-model="newProduct.code"
                 label="كود المنتج"
                 readonly
@@ -259,7 +249,7 @@ onMounted(() => {
               />
             </VCol>
             <VCol cols="12" sm="6">
-              <VTextField
+              <AppTextField
                 v-model="newProduct.name"
                 label="اسم الباقة"
                 placeholder="مثال: باقة الشهرين التأسيسية"
@@ -267,7 +257,7 @@ onMounted(() => {
             </VCol>
 
             <VCol cols="12">
-              <VSelect
+              <AppSelect
                 v-model="newProduct.curriculum_id"
                 :items="curriculums"
                 item-title="name"
@@ -277,7 +267,7 @@ onMounted(() => {
             </VCol>
 
             <VCol cols="12" sm="6">
-              <VTextField
+              <AppTextField
                 v-model.number="newProduct.duration_days"
                 type="number"
                 label="مدة الاشتراك (بالأيام)"
@@ -285,7 +275,7 @@ onMounted(() => {
             </VCol>
 
             <VCol cols="12" sm="6">
-              <VTextField
+              <AppTextField
                 v-model.number="newProduct.price"
                 type="number"
                 label="السعر (بالدينار العراقي)"
@@ -293,7 +283,7 @@ onMounted(() => {
             </VCol>
 
             <VCol cols="12">
-              <VTextarea
+              <AppTextarea
                 v-model="newProduct.description"
                 label="وصف الباقة"
                 rows="2"
@@ -303,8 +293,12 @@ onMounted(() => {
         </VCardText>
         <VCardActions class="pa-4">
           <VSpacer />
-          <VBtn variant="tonal" color="secondary" @click="isAddProductDialogVisible = false">إلغاء</VBtn>
-          <VBtn color="primary" :loading="isSubmitting" @click="saveProduct">حفظ الباقة</VBtn>
+          <VBtn variant="tonal" color="secondary" @click="isAddProductDialogVisible = false">
+            إلغاء
+          </VBtn>
+          <VBtn color="primary" :loading="isSubmitting" @click="saveProduct">
+            حفظ الباقة
+          </VBtn>
         </VCardActions>
       </VCard>
     </VDialog>

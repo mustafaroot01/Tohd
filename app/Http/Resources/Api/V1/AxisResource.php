@@ -19,6 +19,7 @@ class AxisResource extends JsonResource
             'skills_count' => $this->whenCounted('skills'),
             'skills' => SkillResource::collection($this->whenLoaded('skills')),
             'created_at' => $this->created_at?->toISOString(),
+            'updated_at' => $this->updated_at?->toISOString(),
         ];
     }
 }

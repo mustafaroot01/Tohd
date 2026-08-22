@@ -1,46 +1,82 @@
 <script setup lang="ts">
-const axes = ref<any[]>([])
-const skills = ref<any[]>([])
-const isLoading = ref(true)
+import type { DataTableHeader } from '@/components/AppDataTableServer.vue'
+
+// ── axes table (owns the URL query) ──────────────────────────────────────────
+const axesTable = useServerTable('/admin/axes', {
+  defaultSort: 'sort_order',
+  defaultOrder: 'asc',
+})
+
+// ── skills table (second table on the page → no URL sync, keys would clash) ──
+const skillsTable = useServerTable('/admin/skills', {
+  defaultSort: 'sort_order',
+  defaultOrder: 'asc',
+  filters: { axis_id: null },
+  syncQuery: false,
+})
+
+/** Axis options for the skill filter and the skill dialog. */
+const axisOptions = ref<any[]>([])
+
+const loadAxisOptions = async () => {
+  try {
+    const res = await $api('/admin/axes', { query: { per_page: 100 } })
+    if (res?.success)
+      axisOptions.value = res.data
+  }
+  catch (err) {
+    console.error(err)
+  }
+}
+
+const axesHeaders: DataTableHeader[] = [
+  { title: 'المحور', key: 'name', sortable: true, hideable: false },
+  { title: 'الرمز التعريفي', key: 'slug', sortable: true },
+  { title: 'المهارات', key: 'skills_count', align: 'center' },
+  { title: 'الترتيب', key: 'sort_order', sortable: true, align: 'center' },
+  { title: 'الوصف', key: 'description' },
+  { title: 'الإجراءات', key: 'actions', align: 'center', hideable: false },
+]
+
+const skillsHeaders = computed<DataTableHeader[]>(() => [
+  { title: 'المهارة', key: 'name', sortable: true, hideable: false },
+  { title: 'الرمز التعريفي', key: 'slug', sortable: true },
+  {
+    title: 'المحور التابع له',
+    key: 'axis',
+    filter: {
+      key: 'axis_id',
+      anyLabel: 'كل المحاور',
+      options: axisOptions.value.map(a => ({ title: a.name, value: a.id })),
+    },
+  },
+  { title: 'الألعاب', key: 'games_count', align: 'center' },
+  { title: 'الترتيب', key: 'sort_order', sortable: true, align: 'center' },
+  { title: 'الإجراءات', key: 'actions', align: 'center', hideable: false },
+])
 
 const isAddAxisDialogVisible = ref(false)
 const isAddSkillDialogVisible = ref(false)
-
-const newAxis = ref({
-  name: '',
-  description: '',
-  sort_order: 1,
-})
-
-const newSkill = ref({
-  axis_id: '',
-  name: '',
-  description: '',
-  sort_order: 1,
-})
-
 const isSubmitting = ref(false)
 const alertMessage = ref<string | null>(null)
 
-// Edit Axis State
-const editingAxisId = ref<string | null>(null)
+const newAxis = ref({ name: '', description: '', sort_order: 1 })
+const newSkill = ref({ axis_id: '', name: '', description: '', sort_order: 1 })
 
-// Edit Skill State
+const editingAxisId = ref<string | null>(null)
 const editingSkillId = ref<string | null>(null)
 
-// Delete Axis State
 const confirmDeleteAxis = ref(false)
 const pendingDeleteAxis = ref<any | null>(null)
 const isDeletingAxis = ref(false)
 
-// Delete Skill State
 const confirmDeleteSkill = ref(false)
 const pendingDeleteSkill = ref<any | null>(null)
 const isDeletingSkill = ref(false)
 
 const openAddAxisDialog = () => {
   editingAxisId.value = null
-  newAxis.value = { name: '', description: '', sort_order: axes.value.length + 1 }
+  newAxis.value = { name: '', description: '', sort_order: axesTable.total + 1 }
   isAddAxisDialogVisible.value = true
 }
 
@@ -81,44 +117,22 @@ const requestDeleteSkill = (skill: any) => {
   confirmDeleteSkill.value = true
 }
 
-
-
-const fetchData = async () => {
-  isLoading.value = true
-  try {
-    const axesRes = await $api('/admin/axes')
-    if (axesRes?.success)
-      axes.value = axesRes.data
-
-    const skillsRes = await $api('/admin/skills')
-    if (skillsRes?.success)
-      skills.value = skillsRes.data
-  }
-  catch (err) {
-    console.error('Failed to load axes/skills:', err)
-  }
-  finally {
-    isLoading.value = false
-  }
-}
-
 const saveAxis = async () => {
   if (!newAxis.value.name)
     return
+
   isSubmitting.value = true
   try {
     const isEdit = !!editingAxisId.value
     const url = isEdit ? `/admin/axes/${editingAxisId.value}` : '/admin/axes'
     const method = isEdit ? 'PUT' : 'POST'
 
-    const res = await $api(url, {
-      method,
-      body: newAxis.value,
-    })
+    const res = await $api(url, { method, body: newAxis.value })
+
     if (res?.success) {
       isAddAxisDialogVisible.value = false
-      newAxis.value = { name: '', description: '', sort_order: axes.value.length + 1 }
-      await fetchData()
+      newAxis.value = { name: '', description: '', sort_order: 1 }
+      await Promise.all([axesTable.reload(), loadAxisOptions()])
     }
   }
   catch (err: any) {
@@ -132,20 +146,19 @@ const saveAxis = async () => {
 const saveSkill = async () => {
   if (!newSkill.value.name || !newSkill.value.axis_id)
     return
+
   isSubmitting.value = true
   try {
     const isEdit = !!editingSkillId.value
     const url = isEdit ? `/admin/skills/${editingSkillId.value}` : '/admin/skills'
     const method = isEdit ? 'PUT' : 'POST'
 
-    const res = await $api(url, {
-      method,
-      body: newSkill.value,
-    })
+    const res = await $api(url, { method, body: newSkill.value })
+
     if (res?.success) {
       isAddSkillDialogVisible.value = false
       newSkill.value = { axis_id: '', name: '', description: '', sort_order: 1 }
-      await fetchData()
+      await Promise.all([skillsTable.reload(), axesTable.reload()])
     }
   }
   catch (err: any) {
@@ -156,16 +169,17 @@ const saveSkill = async () => {
   }
 }
 
-
 const deleteAxis = async () => {
-  if (!pendingDeleteAxis.value) return
+  if (!pendingDeleteAxis.value)
+    return
+
   isDeletingAxis.value = true
   try {
     await $api(`/admin/axes/${pendingDeleteAxis.value.id}`, { method: 'DELETE' })
-    await fetchData()
+    await Promise.all([axesTable.afterDelete(), skillsTable.reload(), loadAxisOptions()])
   }
-  catch (err) {
-    console.error(err)
+  catch (err: any) {
+    alertMessage.value = err?.data?.message || 'تعذّر حذف المحور — تأكد من عدم ارتباطه بألعاب'
   }
   finally {
     isDeletingAxis.value = false
@@ -175,14 +189,16 @@ const deleteAxis = async () => {
 }
 
 const deleteSkill = async () => {
-  if (!pendingDeleteSkill.value) return
+  if (!pendingDeleteSkill.value)
+    return
+
   isDeletingSkill.value = true
   try {
     await $api(`/admin/skills/${pendingDeleteSkill.value.id}`, { method: 'DELETE' })
-    await fetchData()
+    await Promise.all([skillsTable.afterDelete(), axesTable.reload()])
   }
-  catch (err) {
-    console.error(err)
+  catch (err: any) {
+    alertMessage.value = err?.data?.message || 'تعذّر حذف المهارة — تأكد من عدم ارتباطها بألعاب'
   }
   finally {
     isDeletingSkill.value = false
@@ -191,150 +207,162 @@ const deleteSkill = async () => {
   }
 }
 
-
-
-
-onMounted(() => {
-  fetchData()
-})
+onMounted(loadAxisOptions)
 </script>
 
 <template>
   <div>
-    <!-- Page Header -->
-    <div class="d-flex justify-space-between align-center flex-wrap gap-4 mb-6">
-      <div>
-        <h2 class="text-h4 font-weight-bold">
-          المحاور والمهارات التدريبية 🎯
-        </h2>
-        <p class="text-muted mb-0">
-          إدارة مجالات التدريب الأساسية (التركيز، التواصل البصري، التتبع، التفاعل الاجتماعي) والمهارات التابعة لها
-        </p>
-      </div>
-      <div class="d-flex gap-3">
-        <VBtn
-          color="secondary"
-          variant="tonal"
-          prepend-icon="tabler-plus"
-          @click="openAddSkillDialog"
-        >
-          إضافة مهارة
-        </VBtn>
-        <VBtn
-          color="primary"
-          prepend-icon="tabler-plus"
-          @click="openAddAxisDialog"
-        >
-          إضافة محور جديد
-        </VBtn>
-      </div>
+    <div class="mb-6">
+      <h2 class="text-h4 font-weight-bold">
+        المحاور والمهارات التدريبية 🎯
+      </h2>
+      <p class="text-muted mb-0">
+        إدارة مجالات التدريب الأساسية (التركيز، التواصل البصري، التتبع، التفاعل الاجتماعي) والمهارات التابعة لها
+      </p>
     </div>
 
-    <!-- Axes Grid -->
-    <VRow v-if="!isLoading">
-      <VCol
-        v-for="axis in axes"
-        :key="axis.id"
-        cols="12"
-        md="6"
-      >
-        <VCard class="h-100">
-          <VCardItem>
-            <template #prepend>
-              <VAvatar
-                color="primary"
-                variant="tonal"
-                rounded
-                size="44"
-              >
-                <VIcon icon="tabler-target" size="24" />
-              </VAvatar>
-            </template>
-            <VCardTitle class="text-h5 font-weight-bold">
-              {{ axis.name }}
-            </VCardTitle>
-            <VCardSubtitle>
-              الرمز التعريفي: <code>{{ axis.slug }}</code>
-            </VCardSubtitle>
-            <template #append>
-              <div class="d-flex gap-1">
-                <VBtn
-                  icon="tabler-edit"
-                  size="small"
-                  color="warning"
-                  variant="text"
-                  @click="openEditAxisDialog(axis)"
-                />
-                <VBtn
-                  icon="tabler-trash"
-                  size="small"
-                  color="error"
-                  variant="text"
-                  @click="requestDeleteAxis(axis)"
-                />
-              </div>
-            </template>
-          </VCardItem>
+    <VAlert
+      v-if="alertMessage"
+      color="error"
+      variant="tonal"
+      class="mb-6"
+      closable
+      @click:close="alertMessage = null"
+    >
+      {{ alertMessage }}
+    </VAlert>
 
-          <VCardText>
-            <p class="text-body-2 text-muted mb-4">
-              {{ axis.description || 'لا يوجد وصف تفصيلي للمحور' }}
-            </p>
+    <!-- ── Axes ── -->
+    <AppDataTableServer
+      :table="axesTable"
+      :headers="axesHeaders"
+      title="المحاور التدريبية"
+      icon="tabler-target"
+      search-placeholder="ابحث باسم المحور…"
+      add-label="إضافة محور جديد"
+      empty-text="لا توجد محاور تدريبية معرفة بعد."
+      empty-icon="tabler-target-off"
+      class="mb-6"
+      @add="openAddAxisDialog"
+    >
+      <template #item.name="{ item }">
+        <div class="d-flex align-center gap-3">
+          <VAvatar color="primary" variant="tonal" rounded size="38">
+            <VIcon icon="tabler-target" size="20" />
+          </VAvatar>
+          <span class="font-weight-bold text-high-emphasis">{{ item.name }}</span>
+        </div>
+      </template>
 
-            <h5 class="text-subtitle-2 font-weight-bold mb-2 text-primary">
-              المهارات المندرجة تحت هذا المحور ({{ (skills.filter(s => s.axis_id === axis.id)).length }}):
-            </h5>
+      <template #item.slug="{ item }">
+        <span class="text-caption text-muted" dir="ltr">{{ item.slug }}</span>
+      </template>
 
-            <VList density="compact" class="bg-background rounded pa-2">
-              <VListItem
-                v-for="skill in skills.filter(s => s.axis_id === axis.id)"
-                :key="skill.id"
-                class="rounded mb-1"
-              >
-                <template #prepend>
-                  <VIcon icon="tabler-circle-check" color="success" size="18" class="me-2" />
-                </template>
-                <VListItemTitle class="font-weight-medium">
-                  {{ skill.name }}
-                </VListItemTitle>
-                <VListItemSubtitle class="text-caption">
-                  {{ skill.description }}
-                </VListItemSubtitle>
-                <template #append>
-                  <div class="d-flex gap-1">
-                    <VBtn
-                      icon="tabler-edit"
-                      size="x-small"
-                      color="warning"
-                      variant="text"
-                      @click="openEditSkillDialog(skill)"
-                    />
-                    <VBtn
-                      icon="tabler-trash"
-                      size="x-small"
-                      color="error"
-                      variant="text"
-                      @click="requestDeleteSkill(skill)"
-                    />
-                  </div>
-                </template>
-              </VListItem>
+      <template #item.skills_count="{ item }">
+        <VChip size="small" color="info" variant="tonal">
+          {{ item.skills_count ?? 0 }} مهارة
+        </VChip>
+      </template>
 
-              <div
-                v-if="skills.filter(s => s.axis_id === axis.id).length === 0"
-                class="text-center text-muted py-2 text-caption"
-              >
-                لا توجد مهارات مضافة بعد
-              </div>
-            </VList>
-          </VCardText>
-        </VCard>
-      </VCol>
-    </VRow>
+      <template #item.description="{ item }">
+        <span
+          v-if="item.description"
+          class="text-caption text-muted d-inline-block text-truncate"
+          style="max-inline-size: 18rem;"
+        >{{ item.description }}</span>
+        <span v-else class="text-muted text-caption">—</span>
+      </template>
 
-    <div v-else class="text-center py-12">
-      <VProgressCircular indeterminate color="primary" size="48" />
-    </div>
+      <template #item.actions="{ item }">
+        <div class="d-flex justify-center gap-1">
+          <VBtn
+            icon
+            size="small"
+            color="warning"
+            variant="text"
+            @click="openEditAxisDialog(item)"
+          >
+            <VIcon icon="tabler-edit" size="20" />
+          </VBtn>
+          <VBtn
+            icon
+            size="small"
+            color="error"
+            variant="text"
+            @click="requestDeleteAxis(item)"
+          >
+            <VIcon icon="tabler-trash" size="20" />
+          </VBtn>
+        </div>
+      </template>
+    </AppDataTableServer>
+
+    <!-- ── Skills ── -->
+    <AppDataTableServer
+      :table="skillsTable"
+      :headers="skillsHeaders"
+      title="المهارات التدريبية"
+      icon="tabler-bulb"
+      search-placeholder="ابحث باسم المهارة…"
+      add-label="إضافة مهارة"
+      empty-text="لا توجد مهارات مضافة بعد."
+      empty-icon="tabler-bulb-off"
+      @add="openAddSkillDialog"
+    >
+      <template #item.name="{ item }">
+        <div>
+          <div class="font-weight-bold text-high-emphasis">
+            {{ item.name }}
+          </div>
+          <div
+            v-if="item.description"
+            class="text-caption text-muted text-truncate"
+            style="max-inline-size: 18rem;"
+          >
+            {{ item.description }}
+          </div>
+        </div>
+      </template>
+
+      <template #item.slug="{ item }">
+        <span class="text-caption text-muted" dir="ltr">{{ item.slug }}</span>
+      </template>
+
+      <template #item.axis="{ item }">
+        <VChip size="small" color="primary" variant="tonal">
+          {{ item.axis?.name || '—' }}
+        </VChip>
+      </template>
+
+      <template #item.games_count="{ item }">
+        <VChip size="small" color="secondary" variant="tonal">
+          {{ item.games_count ?? 0 }} لعبة
+        </VChip>
+      </template>
+
+      <template #item.actions="{ item }">
+        <div class="d-flex justify-center gap-1">
+          <VBtn
+            icon
+            size="small"
+            color="warning"
+            variant="text"
+            @click="openEditSkillDialog(item)"
+          >
+            <VIcon icon="tabler-edit" size="20" />
+          </VBtn>
+          <VBtn
+            icon
+            size="small"
+            color="error"
+            variant="text"
+            @click="requestDeleteSkill(item)"
+          >
+            <VIcon icon="tabler-trash" size="20" />
+          </VBtn>
+        </div>
+      </template>
+    </AppDataTableServer>
 
     <!-- Add/Edit Axis Dialog -->
     <VDialog v-model="isAddAxisDialogVisible" max-width="500">
@@ -344,13 +372,13 @@ onMounted(() => {
         </VCardTitle>
         <VDivider />
         <VCardText class="pa-4">
-          <VTextField
+          <AppTextField
             v-model="newAxis.name"
             label="اسم المحور"
             placeholder="مثال: التركيز والانتباه"
             class="mb-4"
           />
-          <VTextarea
+          <AppTextarea
             v-model="newAxis.description"
             label="الوصف والهدف التدريبي"
             placeholder="شرح مبسط للهدف من هذا المحور..."
@@ -360,8 +388,12 @@ onMounted(() => {
         </VCardText>
         <VCardActions class="pa-4">
           <VSpacer />
-          <VBtn variant="tonal" color="secondary" @click="isAddAxisDialogVisible = false">إلغاء</VBtn>
-          <VBtn color="primary" :loading="isSubmitting" @click="saveAxis">حفظ المحور</VBtn>
+          <VBtn variant="tonal" color="secondary" @click="isAddAxisDialogVisible = false">
+            إلغاء
+          </VBtn>
+          <VBtn color="primary" :loading="isSubmitting" @click="saveAxis">
+            حفظ المحور
+          </VBtn>
         </VCardActions>
       </VCard>
     </VDialog>
@@ -374,21 +406,21 @@ onMounted(() => {
         </VCardTitle>
         <VDivider />
         <VCardText class="pa-4">
-          <VSelect
+          <AppSelect
             v-model="newSkill.axis_id"
-            :items="axes"
+            :items="axisOptions"
             item-title="name"
             item-value="id"
             label="المحور التابع له"
             class="mb-4"
           />
-          <VTextField
+          <AppTextField
             v-model="newSkill.name"
             label="اسم المهارة"
             placeholder="مثال: الانتباه الانتقائي"
             class="mb-4"
           />
-          <VTextarea
+          <AppTextarea
             v-model="newSkill.description"
             label="وصف المهارة"
             placeholder="تفاصيل المهارة..."
@@ -398,12 +430,16 @@ onMounted(() => {
         </VCardText>
         <VCardActions class="pa-4">
           <VSpacer />
-          <VBtn variant="tonal" color="secondary" @click="isAddSkillDialogVisible = false">إلغاء</VBtn>
-          <VBtn color="primary" :loading="isSubmitting" @click="saveSkill">حفظ المهارة</VBtn>
+          <VBtn variant="tonal" color="secondary" @click="isAddSkillDialogVisible = false">
+            إلغاء
+          </VBtn>
+          <VBtn color="primary" :loading="isSubmitting" @click="saveSkill">
+            حفظ المهارة
+          </VBtn>
         </VCardActions>
       </VCard>
     </VDialog>
-    <!-- Confirm Delete Axis Modal -->
+
     <ConfirmDeleteDialog
       v-model="confirmDeleteAxis"
       title="تأكيد حذف المحور التدريبي"
@@ -413,7 +449,6 @@ onMounted(() => {
       @confirm="deleteAxis"
     />
 
-    <!-- Confirm Delete Skill Modal -->
     <ConfirmDeleteDialog
       v-model="confirmDeleteSkill"
       title="تأكيد حذف المهارة"

@@ -10,6 +10,7 @@ use App\Http\Requests\Api\V1\Admin\UpdateProductRequest;
 use App\Http\Resources\Api\V1\ProductResource;
 use App\Models\Product;
 use App\Support\ApiResponse;
+use App\Support\TableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -18,31 +19,20 @@ class ProductController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $perPage = min((int) $request->input('per_page', 20), 100);
-        $query = Product::with('curriculum')->latest();
+        $query = Product::with('curriculum');
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->input('status'));
-        }
+        TableQuery::filters($query, $request, ['status', 'curriculum_id']);
 
-        if ($request->filled('search')) {
-            $search = $request->input('search');
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('code', 'like', "%{$search}%");
-            });
-        }
+        TableQuery::search($query, $request, ['name', 'code']);
 
-        $products = $query->paginate($perPage);
+        TableQuery::sort($query, $request, ['name', 'code', 'price', 'duration_days', 'status', 'created_at'], 'created_at');
+
+        $products = $query->paginate(TableQuery::perPage($request));
 
         return ApiResponse::success(
             data: ProductResource::collection($products),
             message: 'تم استرجاع قائمة المنتجات بنجاح',
-            meta: [
-                'current_page' => $products->currentPage(),
-                'per_page' => $products->perPage(),
-                'total' => $products->total(),
-            ]
+            meta: TableQuery::meta($products)
         );
     }
 

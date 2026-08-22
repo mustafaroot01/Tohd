@@ -1,13 +1,13 @@
 <script setup lang="ts">
-const games = ref<any[]>([])
+import type { DataTableHeader } from '@/components/AppDataTableServer.vue'
+
 const axes = ref<any[]>([])
 const skills = ref<any[]>([])
 const levels = ref<any[]>([])
-const isLoading = ref(true)
 const isAddGameDialogVisible = ref(false)
 const isSubmitting = ref(false)
 const isArchiving = ref(false)
-const notification = ref<{ text: string; color: string } | null>(null)
+const { notification, notifySuccess, notifyInfo, notifyWarning, notifyError } = useNotification()
 const confirmArchive = ref(false)
 const pendingArchiveGame = ref<any | null>(null)
 
@@ -107,36 +107,69 @@ const gameTypes = [
   { value: 'ORDER', title: 'ترتيب (ORDER)' },
 ]
 
-const fetchGames = async () => {
-  isLoading.value = true
-  try {
-    const res = await $api('/admin/games')
-    if (res?.success)
-      games.value = res.data
+const table = useServerTable('/admin/games', {
+  defaultSort: 'created_at',
+  defaultOrder: 'desc',
+  filters: { status: null, type: null, axis_id: null, difficulty: null },
+})
 
-    const axesRes = await $api('/admin/axes')
+const headers = computed<DataTableHeader[]>(() => [
+  { title: 'كود اللعبة', key: 'code', sortable: true },
+  { title: 'اسم اللعبة', key: 'name', sortable: true, hideable: false },
+  {
+    title: 'النوع',
+    key: 'type',
+    sortable: true,
+    filter: { anyLabel: 'كل الأنواع', options: gameTypes.map(t => ({ title: t.title, value: t.value })) },
+  },
+  {
+    title: 'المحور',
+    key: 'axis',
+    filter: {
+      key: 'axis_id',
+      anyLabel: 'كل المحاور',
+      options: axes.value.map(a => ({ title: a.name, value: a.id })),
+    },
+  },
+  {
+    title: 'المستوى والمدة',
+    key: 'difficulty',
+    sortable: true,
+    filter: { anyLabel: 'كل الصعوبات', options: statusOptions(GAME_DIFFICULTY) },
+  },
+  {
+    title: 'الحالة',
+    key: 'status',
+    sortable: true,
+    filter: { options: statusOptions(GAME_STATUS) },
+  },
+  { title: 'الإجراءات ودورة النشر', key: 'actions', align: 'center', hideable: false },
+])
+
+/** Reference lists used by the filters and the create/edit dialog. */
+const fetchReferenceData = async () => {
+  try {
+    const [axesRes, skillsRes, levelsRes] = await Promise.all([
+      $api('/admin/axes', { query: { per_page: 100 } }),
+      $api('/admin/skills', { query: { per_page: 100 } }),
+      $api('/admin/levels', { query: { all: true } }),
+    ])
+
     if (axesRes?.success)
       axes.value = axesRes.data
-
-    const skillsRes = await $api('/admin/skills')
     if (skillsRes?.success)
       skills.value = skillsRes.data
-
-    const levelsRes = await $api('/admin/levels?all=true')
     if (levelsRes?.success)
       levels.value = levelsRes.data
   }
   catch (err) {
     console.error(err)
   }
-  finally {
-    isLoading.value = false
-  }
 }
 
 const saveGame = async () => {
   if (!newGame.value.name || !newGame.value.code || !newGame.value.axis_id || !newGame.value.skill_id || !newGame.value.level_id) {
-    notification.value = { text: 'يرجى إدخال جميع الحقول المطلوبة (اسم اللعبة، الكود، المحور، المهارة، والمستوى)', color: 'warning' }
+    notifyWarning('يرجى إدخال جميع الحقول المطلوبة (اسم اللعبة، الكود، المحور، المهارة، والمستوى)')
     return
   }
 
@@ -162,16 +195,13 @@ const saveGame = async () => {
     })
     if (res?.success) {
       isAddGameDialogVisible.value = false
-      notification.value = { 
-        text: isEdit ? 'تم تحديث بيانات اللعبة بنجاح' : 'تمت إضافة اللعبة بنجاح كمسودة', 
-        color: 'success' 
-      }
-      await fetchGames()
+      notifySuccess(isEdit ? 'تم تحديث بيانات اللعبة بنجاح' : 'تمت إضافة اللعبة بنجاح كمسودة')
+      await table.reload()
     }
   }
 
   catch (err: any) {
-    notification.value = { text: err?.data?.message || 'فشل حفظ اللعبة', color: 'error' }
+    notifyError(err, 'فشل حفظ اللعبة')
   }
 
   finally {
@@ -183,12 +213,12 @@ const publishGame = async (game: any) => {
   try {
     const res = await $api(`/admin/games/${game.id}/publish`, { method: 'POST' })
     if (res?.success) {
-      notification.value = { text: `تم نشر لعبة (${game.name}) بنجاح!`, color: 'success' }
-      await fetchGames()
+      notifySuccess(`تم نشر لعبة (${game.name}) بنجاح!`)
+      await table.reload()
     }
   }
   catch (err: any) {
-    notification.value = { text: err?.data?.message || 'فشل نشر اللعبة', color: 'error' }
+    notifyError(err, 'فشل نشر اللعبة')
   }
 }
 
@@ -196,12 +226,12 @@ const approveGame = async (game: any) => {
   try {
     const res = await $api(`/admin/games/${game.id}/approve`, { method: 'POST' })
     if (res?.success) {
-      notification.value = { text: `تم اعتماد لعبة (${game.name}) بنجاح`, color: 'info' }
-      await fetchGames()
+      notifySuccess(`تم اعتماد لعبة (${game.name}) بنجاح`)
+      await table.reload()
     }
   }
   catch (err: any) {
-    notification.value = { text: err?.data?.message || 'فشل اعتماد اللعبة', color: 'error' }
+    notifyError(err, 'فشل اعتماد اللعبة')
   }
 }
 
@@ -216,12 +246,12 @@ const archiveGame = async () => {
   try {
     const res = await $api(`/admin/games/${pendingArchiveGame.value.id}/archive`, { method: 'POST' })
     if (res?.success) {
-      notification.value = { text: `تمت أرشفة لعبة (‎${pendingArchiveGame.value.name}‎)`, color: 'warning' }
-      await fetchGames()
+      notifyInfo(`تمت أرشفة لعبة (‎${pendingArchiveGame.value.name}‎)`)
+      await table.reload()
     }
   }
   catch (err: any) {
-    notification.value = { text: err?.data?.message || 'فشل أرشفة اللعبة', color: 'error' }
+    notifyError(err, 'فشل أرشفة اللعبة')
   }
   finally {
     isArchiving.value = false
@@ -230,28 +260,8 @@ const archiveGame = async () => {
   }
 }
 
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case 'PUBLISHED': return 'success'
-    case 'APPROVED': return 'info'
-    case 'TESTING': return 'warning'
-    case 'ARCHIVED': return 'secondary'
-    default: return 'primary'
-  }
-}
-
-const getStatusLabel = (status: string) => {
-  switch (status) {
-    case 'PUBLISHED': return 'فعالة'
-    case 'APPROVED': return 'معتمدة'
-    case 'TESTING': return 'قيد الاختبار'
-    case 'ARCHIVED': return 'مؤرشفة'
-    default: return 'مسودة'
-  }
-}
-
 onMounted(() => {
-  fetchGames()
+  fetchReferenceData()
 })
 
 // ─────────────────────────────────────────
@@ -279,7 +289,7 @@ const previewGameAnimation = (game: any) => {
     previewFileType.value = lottieAsset.type
     isPreviewDialogVisible.value = true
   } else {
-    notification.value = { text: 'لا يوجد ملف متحرك مرتبط بهذه اللعبة حالياً لمعاينته', color: 'warning' }
+    notifyWarning('لا يوجد ملف متحرك مرتبط بهذه اللعبة حالياً لمعاينته')
   }
 }
 
@@ -298,160 +308,148 @@ const previewGameAnimation = (game: any) => {
           إدارة مستودع الألعاب، تهيئة البارامترات، واختبار واعتماد الألعاب للنشر في المناهج
         </p>
       </div>
-      <VBtn
-        color="primary"
-        prepend-icon="tabler-plus"
-        @click="openAddGameDialog"
-      >
-        إضافة لعبة جديدة
-      </VBtn>
     </div>
 
     <!-- Notification Alert -->
-    <VAlert
-      v-if="notification"
-      :color="notification.color"
-      variant="tonal"
-      class="mb-6"
-      closable
-      @click:close="notification = null"
+    <AppNotification v-model="notification" />
+
+    <AppDataTableServer
+      :table="table"
+      :headers="headers"
+      title="مستودع الألعاب"
+      icon="tabler-device-gamepad"
+      search-placeholder="ابحث بالاسم أو الكود…"
+      add-label="إضافة لعبة جديدة"
+      empty-text="لا توجد ألعاب مسجلة في النظام بعد."
+      empty-icon="tabler-device-gamepad-off"
+      @add="openAddGameDialog"
     >
-      {{ notification.text }}
-    </VAlert>
+      <template #item.code="{ item }">
+        <span class="font-weight-bold text-primary text-caption" dir="ltr">{{ item.code }}</span>
+      </template>
 
-    <!-- Games Table Card -->
-    <VCard>
-      <VCardText class="pa-0">
-        <VTable hover class="text-no-wrap">
-          <thead>
-            <tr>
-              <th class="text-start">كود اللعبة</th>
-              <th class="text-start">اسم اللعبة</th>
-              <th class="text-start">النوع والمحور</th>
-              <th class="text-start">المستوى والمدة</th>
-              <th class="text-start">الحالة</th>
-              <th class="text-center">الإجراءات ودورة النشر</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="game in games" :key="game.id">
-              <td>
-                <span class="font-weight-bold text-primary"><code>{{ game.code }}</code></span>
-              </td>
-              <td>
-                <div class="d-flex align-center gap-2">
-                  <VAvatar color="primary" variant="tonal" size="36" rounded>
-                    <VIcon icon="tabler-device-gamepad" size="20" />
-                  </VAvatar>
-                  <div>
-                    <div class="font-weight-bold">{{ game.name }}</div>
-                    <div class="text-caption text-muted">{{ game.description }}</div>
-                  </div>
-                </div>
-              </td>
-              <td>
-                <div>
-                  <VChip size="x-small" color="primary" class="me-1 mb-1">
-                    {{ game.type }}
-                  </VChip>
-                  <div class="text-caption text-muted">
-                    {{ game.axis?.name || 'غير محدد' }}
-                  </div>
-                </div>
-              </td>
-              <td>
-                <div class="text-caption font-weight-medium">
-                  {{ game.game_level?.name || `مستوى ${game.level}` }} ({{ game.difficulty }})
-                </div>
-                <div class="text-caption text-muted">{{ game.duration_seconds }} ثانية</div>
-              </td>
-              <td>
-                <VChip
-                  size="small"
-                  :color="getStatusColor(game.status)"
-                  variant="tonal"
-                  class="font-weight-medium"
-                >
-                  {{ getStatusLabel(game.status) }}
-                </VChip>
-              </td>
-              <td class="text-center">
-                <div class="d-flex justify-center gap-1">
-                  <!-- Preview Game/Lottie Button -->
-                  <VBtn
-                    icon="tabler-device-gamepad-2"
-                    size="small"
-                    color="purple"
-                    variant="tonal"
-                    @click="previewGameAnimation(game)"
-                  >
-                    <VIcon icon="tabler-device-gamepad-2" size="18" />
-                    <VTooltip activator="parent" location="top">معاينة اللعبة</VTooltip>
-                  </VBtn>
+      <template #item.name="{ item }">
+        <div class="d-flex align-center gap-2">
+          <VAvatar color="primary" variant="tonal" size="36" rounded>
+            <VIcon icon="tabler-device-gamepad" size="20" />
+          </VAvatar>
+          <div>
+            <div class="font-weight-bold text-high-emphasis">
+              {{ item.name }}
+            </div>
+            <div
+              v-if="item.description"
+              class="text-caption text-muted text-truncate"
+              style="max-inline-size: 16rem;"
+            >
+              {{ item.description }}
+            </div>
+          </div>
+        </div>
+      </template>
 
-                  <!-- Edit Button -->
-                  <VBtn
-                    icon="tabler-edit"
-                    size="small"
-                    color="warning"
-                    variant="tonal"
-                    @click="openEditGameDialog(game)"
-                  >
-                    <VIcon icon="tabler-edit" size="18" />
-                    <VTooltip activator="parent" location="top">تعديل</VTooltip>
-                  </VBtn>
+      <template #item.type="{ item }">
+        <VChip size="x-small" color="primary" variant="tonal">
+          {{ item.type }}
+        </VChip>
+      </template>
 
-                  <!-- Approve -->
-                  <VBtn
-                    v-if="game.status === 'DRAFT' || game.status === 'TESTING'"
-                    icon="tabler-check"
-                    size="small"
-                    color="info"
-                    variant="tonal"
-                    @click="approveGame(game)"
-                  >
-                    <VIcon icon="tabler-check" size="18" />
-                    <VTooltip activator="parent" location="top">اعتماد اللعبة</VTooltip>
-                  </VBtn>
+      <template #item.axis="{ item }">
+        <span class="text-body-2">{{ item.axis?.name || '—' }}</span>
+      </template>
 
-                  <!-- Publish -->
-                  <VBtn
-                    v-if="game.status !== 'PUBLISHED'"
-                    icon="tabler-send"
-                    size="small"
-                    color="success"
-                    variant="tonal"
-                    @click="publishGame(game)"
-                  >
-                    <VIcon icon="tabler-send" size="18" />
-                    <VTooltip activator="parent" location="top">نشر اللعبة</VTooltip>
-                  </VBtn>
+      <template #item.difficulty="{ item }">
+        <div class="text-caption font-weight-medium">
+          {{ item.game_level?.name || `مستوى ${item.level}` }} ({{ item.difficulty }})
+        </div>
+        <div class="text-caption text-muted">
+          {{ item.duration_seconds }} ثانية
+        </div>
+      </template>
 
-                  <!-- Archive -->
-                  <VBtn
-                    v-if="game.status === 'PUBLISHED'"
-                    icon="tabler-archive"
-                    size="small"
-                    color="secondary"
-                    variant="tonal"
-                    @click="requestArchiveGame(game)"
-                  >
-                    <VIcon icon="tabler-archive" size="18" />
-                    <VTooltip activator="parent" location="top">أرشفة</VTooltip>
-                  </VBtn>
-                </div>
-              </td>
-            </tr>
+      <template #item.status="{ item }">
+        <VChip
+          size="small"
+          :color="statusColor(GAME_STATUS, item.status)"
+          variant="tonal"
+          class="font-weight-medium"
+        >
+          {{ statusLabel(GAME_STATUS, item.status) }}
+        </VChip>
+      </template>
 
-            <tr v-if="games.length === 0 && !isLoading">
-              <td colspan="6" class="text-center py-8 text-muted">
-                لا توجد ألعاب مسجلة في النظام بعد.
-              </td>
-            </tr>
-          </tbody>
-        </VTable>
-      </VCardText>
-    </VCard>
+      <template #item.actions="{ item }">
+        <div class="d-flex justify-center gap-1">
+          <VBtn
+            icon
+            size="small"
+            color="purple"
+            variant="tonal"
+            @click="previewGameAnimation(item)"
+          >
+            <VIcon icon="tabler-device-gamepad-2" size="18" />
+            <VTooltip activator="parent" location="top">
+              معاينة اللعبة
+            </VTooltip>
+          </VBtn>
+
+          <VBtn
+            icon
+            size="small"
+            color="warning"
+            variant="tonal"
+            @click="openEditGameDialog(item)"
+          >
+            <VIcon icon="tabler-edit" size="18" />
+            <VTooltip activator="parent" location="top">
+              تعديل
+            </VTooltip>
+          </VBtn>
+
+          <VBtn
+            v-if="item.status === 'DRAFT' || item.status === 'TESTING'"
+            icon
+            size="small"
+            color="info"
+            variant="tonal"
+            @click="approveGame(item)"
+          >
+            <VIcon icon="tabler-check" size="18" />
+            <VTooltip activator="parent" location="top">
+              اعتماد اللعبة
+            </VTooltip>
+          </VBtn>
+
+          <VBtn
+            v-if="item.status !== 'PUBLISHED'"
+            icon
+            size="small"
+            color="success"
+            variant="tonal"
+            @click="publishGame(item)"
+          >
+            <VIcon icon="tabler-send" size="18" />
+            <VTooltip activator="parent" location="top">
+              نشر اللعبة
+            </VTooltip>
+          </VBtn>
+
+          <VBtn
+            v-if="item.status === 'PUBLISHED'"
+            icon
+            size="small"
+            color="secondary"
+            variant="tonal"
+            @click="requestArchiveGame(item)"
+          >
+            <VIcon icon="tabler-archive" size="18" />
+            <VTooltip activator="parent" location="top">
+              أرشفة
+            </VTooltip>
+          </VBtn>
+        </div>
+      </template>
+    </AppDataTableServer>
 
     <!-- Add/Edit Game Dialog -->
     <VDialog v-model="isAddGameDialogVisible" max-width="700">

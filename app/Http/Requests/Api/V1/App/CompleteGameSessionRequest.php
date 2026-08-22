@@ -22,13 +22,4 @@ class CompleteGameSessionRequest extends FormRequest
             'metadata' => ['nullable', 'array'],
         ];
     }
-
-    public function messages(): array
-    {
-        return [
-            'attempts.required' => 'حقل عدد المحاولات إلزامي.',
-            'correct_attempts.required' => 'حقل المحاولات الصحيحة إلزامي.',
-            'duration_seconds.required' => 'مدة الجلسة بالثواني إلزامية.',
-        ];
-    }
 }

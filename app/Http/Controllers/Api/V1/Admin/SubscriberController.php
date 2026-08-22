@@ -17,6 +17,7 @@ use App\Models\Subscriber;
 use App\Models\UserCurriculumAssignment;
 use App\Services\ProgressCalculationService;
 use App\Support\ApiResponse;
+use App\Support\TableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -24,31 +25,20 @@ class SubscriberController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $perPage = min((int) $request->input('per_page', 20), 100);
-        $query = Subscriber::latest();
+        $query = Subscriber::query();
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->input('status'));
-        }
+        TableQuery::filters($query, $request, ['status']);
 
-        if ($request->filled('search')) {
-            $search = $request->input('search');
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('phone', 'like', "%{$search}%");
-            });
-        }
+        TableQuery::search($query, $request, ['name', 'phone']);
 
-        $subscribers = $query->paginate($perPage);
+        TableQuery::sort($query, $request, ['name', 'phone', 'status', 'last_activity_at', 'created_at'], 'created_at');
+
+        $subscribers = $query->paginate(TableQuery::perPage($request));
 
         return ApiResponse::success(
             data: SubscriberResource::collection($subscribers),
             message: 'تم استرجاع قائمة المشتركين بنجاح',
-            meta: [
-                'current_page' => $subscribers->currentPage(),
-                'per_page' => $subscribers->perPage(),
-                'total' => $subscribers->total(),
-            ]
+            meta: TableQuery::meta($subscribers)
         );
     }
 

@@ -7,7 +7,7 @@ const settingsStore = useSettingsStore()
 const activeTab = ref('general')
 const isLoading = ref(true)
 const isSaving = ref(false)
-const notification = ref<{ text: string; color: string } | null>(null)
+const { notification, notifySuccess, notifyError } = useNotification()
 
 // Settings Form State
 const settingsForm = ref({
@@ -48,7 +48,7 @@ const fetchSettingsData = async () => {
       logoPreview.value = res.data.app_logo_url || null
     }
   } catch (err: any) {
-    notification.value = { text: err?.data?.message || 'فشل تحميل إعدادات النظام', color: 'error' }
+    notifyError(err, 'فشل تحميل إعدادات النظام')
   } finally {
     isLoading.value = false
   }
@@ -85,7 +85,7 @@ const saveSettings = async () => {
     })
 
     if (res?.success) {
-      notification.value = { text: 'تم حفظ إعدادات النظام وتخصيص الهوية بنجاح', color: 'success' }
+      notifySuccess('تم حفظ إعدادات النظام وتخصيص الهوية بنجاح')
       logoFile.value = null
       settingsForm.value.otp_api_key = ''
       isOtpApiKeyConfigured.value = !!res.data.otp_api_key_configured
@@ -98,7 +98,7 @@ const saveSettings = async () => {
       }
     }
   } catch (err: any) {
-    notification.value = { text: err?.data?.message || 'حدث خطأ أثناء حفظ الإعدادات', color: 'error' }
+    notifyError(err, 'حدث خطأ أثناء حفظ الإعدادات')
   } finally {
     isSaving.value = false
   }
@@ -143,16 +143,7 @@ onMounted(() => {
     </div>
 
     <!-- Alert Notification -->
-    <VAlert
-      v-if="notification"
-      :color="notification.color"
-      variant="tonal"
-      class="mb-6"
-      closable
-      @click:close="notification = null"
-    >
-      {{ notification.text }}
-    </VAlert>
+    <AppNotification v-model="notification" />
 
     <div v-if="isLoading" class="text-center py-12">
       <VProgressCircular indeterminate color="primary" size="48" />

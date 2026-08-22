@@ -14,6 +14,7 @@ use App\Http\Requests\Api\V1\Admin\UpdateGameRequest;
 use App\Http\Resources\Api\V1\Admin\AdminGameResource;
 use App\Models\Game;
 use App\Support\ApiResponse;
+use App\Support\TableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -22,47 +23,20 @@ class GameController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $perPage = min((int) $request->input('per_page', 20), 100);
-        $query = Game::with(['axis', 'skill', 'gameLevel', 'assets'])->latest();
+        $query = Game::with(['axis', 'skill', 'gameLevel', 'assets']);
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->input('status'));
-        }
+        TableQuery::filters($query, $request, ['status', 'type', 'axis_id', 'skill_id', 'difficulty']);
 
-        if ($request->filled('type')) {
-            $query->where('type', $request->input('type'));
-        }
+        TableQuery::search($query, $request, ['name', 'code']);
 
-        if ($request->filled('axis_id')) {
-            $query->where('axis_id', $request->input('axis_id'));
-        }
+        TableQuery::sort($query, $request, ['name', 'code', 'status', 'type', 'difficulty', 'duration_seconds', 'published_at', 'created_at'], 'created_at');
 
-        if ($request->filled('skill_id')) {
-            $query->where('skill_id', $request->input('skill_id'));
-        }
-
-        if ($request->filled('difficulty')) {
-            $query->where('difficulty', $request->input('difficulty'));
-        }
-
-        if ($request->filled('search')) {
-            $search = $request->input('search');
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('code', 'like', "%{$search}%");
-            });
-        }
-
-        $games = $query->paginate($perPage);
+        $games = $query->paginate(TableQuery::perPage($request));
 
         return ApiResponse::success(
             data: AdminGameResource::collection($games),
             message: 'تم استرجاع قائمة الألعاب بنجاح',
-            meta: [
-                'current_page' => $games->currentPage(),
-                'per_page' => $games->perPage(),
-                'total' => $games->total(),
-            ]
+            meta: TableQuery::meta($games)
         );
     }
 

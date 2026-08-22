@@ -3,11 +3,14 @@
 namespace App\Http\Resources\Api\V1\Admin;
 
 use App\Http\Resources\Api\V1\UserResource;
+use App\Http\Resources\Concerns\SerializesEnums;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class AdminCurriculumResource extends JsonResource
 {
+    use SerializesEnums;
+
     public function toArray(Request $request): array
     {
         return [
@@ -16,7 +19,7 @@ class AdminCurriculumResource extends JsonResource
             'name' => $this->name,
             'slug' => $this->slug,
             'description' => $this->description,
-            'status' => $this->status?->value ?? (string) $this->status,
+            'status' => $this->enumValue($this->status),
             'version' => $this->version,
             'published_at' => $this->published_at?->toISOString(),
             'months_count' => $this->whenCounted('months'),

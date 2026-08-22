@@ -21,14 +21,4 @@ class GenerateActivationCodesRequest extends FormRequest
             'expires_at' => ['nullable', 'date', 'after:now'],
         ];
     }
-
-    public function messages(): array
-    {
-        return [
-            'product_id.required' => 'حقل المنتج المطلوب توليد الأكواد له إلزامي.',
-            'quantity.required' => 'يرجى تحديد عدد الأكواد المطلوبة.',
-            'quantity.min' => 'يجب توليد كود واحد على الأقل.',
-            'expires_at.after' => 'تاريخ انتهاء الصلاحية يجب أن يكون في المستقبل.',
-        ];
-    }
 }

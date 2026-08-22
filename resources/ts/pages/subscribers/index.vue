@@ -1,8 +1,27 @@
 <script setup lang="ts">
+import type { DataTableHeader } from '@/components/AppDataTableServer.vue'
+
 const router = useRouter()
 
-const subscribers = ref<any[]>([])
-const isLoading = ref(true)
+const headers: DataTableHeader[] = [
+  { title: 'المشترك', key: 'name', sortable: true, hideable: false },
+  { title: 'رقم الهاتف', key: 'phone', sortable: true },
+  {
+    title: 'الحالة',
+    key: 'status',
+    sortable: true,
+    filter: { options: statusOptions(SUBSCRIBER_STATUS) },
+  },
+  { title: 'آخر نشاط', key: 'last_activity_at', sortable: true },
+  { title: 'تاريخ التسجيل', key: 'created_at', sortable: true },
+  { title: 'التفاصيل', key: 'actions', align: 'center', hideable: false },
+]
+
+const table = useServerTable('/admin/subscribers', {
+  defaultSort: 'created_at',
+  defaultOrder: 'desc',
+  filters: { status: null },
+})
 
 const isAddDialogVisible = ref(false)
 const isSaving = ref(false)
@@ -15,39 +34,6 @@ const form = ref({
   address: '',
   status: 'ACTIVE',
 })
-
-const statusLabel = (status: string) => {
-  if (status === 'ACTIVE')
-    return 'فعال'
-  if (status === 'SUSPENDED')
-    return 'موقوف'
-
-  return 'غير مفعل'
-}
-
-const statusColor = (status: string) => {
-  if (status === 'ACTIVE')
-    return 'success'
-  if (status === 'SUSPENDED')
-    return 'error'
-
-  return 'warning'
-}
-
-const fetchSubscribers = async () => {
-  isLoading.value = true
-  try {
-    const res = await $api('/admin/subscribers')
-    if (res?.success)
-      subscribers.value = res.data
-  }
-  catch (err) {
-    console.error(err)
-  }
-  finally {
-    isLoading.value = false
-  }
-}
 
 const openSubscriber = (subscriber: any) => {
   router.push(`/subscribers/${subscriber.id}`)
@@ -74,7 +60,7 @@ const submitAdd = async () => {
     if (res?.success) {
       isAddDialogVisible.value = false
       resetForm()
-      await fetchSubscribers()
+      await table.reload()
     }
   }
   catch (err) {
@@ -84,100 +70,78 @@ const submitAdd = async () => {
     isSaving.value = false
   }
 }
-
-onMounted(() => {
-  fetchSubscribers()
-})
 </script>
 
 <template>
   <div>
-    <!-- Header -->
-    <div class="d-flex justify-space-between align-center flex-wrap gap-4 mb-6">
-      <div>
-        <h2 class="text-h4 font-weight-bold">
-          المشتركون 👨‍👩‍👧
-        </h2>
-        <p class="text-muted mb-0">
-          استعراض حسابات المشتركين (عملاء التطبيق)، حالة الاشتراك، وبيانات المناهج المفعلة
-        </p>
-      </div>
-      <VBtn
-        color="primary"
-        prepend-icon="tabler-plus"
-        @click="isAddDialogVisible = true"
-      >
-        إضافة مشترك
-      </VBtn>
+    <div class="mb-6">
+      <h2 class="text-h4 font-weight-bold">
+        المشتركون 👨‍👩‍👧
+      </h2>
+      <p class="text-muted mb-0">
+        استعراض حسابات المشتركين (عملاء التطبيق)، حالة الاشتراك، وبيانات المناهج المفعلة
+      </p>
     </div>
 
-    <!-- Subscribers Table Card -->
-    <VCard>
-      <VCardText class="pa-0">
-        <VTable hover class="text-no-wrap">
-          <thead>
-            <tr>
-              <th class="text-start">المشترك</th>
-              <th class="text-start">رقم الهاتف</th>
-              <th class="text-start">الحالة</th>
-              <th class="text-start">تاريخ التسجيل</th>
-              <th class="text-center">التفاصيل</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="subscriber in subscribers" :key="subscriber.id">
-              <td>
-                <div class="d-flex align-center gap-3">
-                  <VAvatar color="primary" variant="tonal" size="38">
-                    <VIcon icon="tabler-user" size="20" />
-                  </VAvatar>
-                  <div>
-                    <div class="font-weight-bold">{{ subscriber.name }}</div>
-                  </div>
-                </div>
-              </td>
-              <td dir="ltr" class="text-end">{{ subscriber.phone }}</td>
-              <td>
-                <VChip
-                  size="small"
-                  :color="statusColor(subscriber.status)"
-                  variant="tonal"
-                >
-                  {{ statusLabel(subscriber.status) }}
-                </VChip>
-              </td>
-              <td>
-                <span class="text-caption">
-                  {{ subscriber.created_at ? new Date(subscriber.created_at).toLocaleDateString('ar-SA') : '-' }}
-                </span>
-              </td>
-              <td class="text-center">
-                <VBtn
-                  size="small"
-                  variant="tonal"
-                  color="primary"
-                  prepend-icon="tabler-eye"
-                  @click="openSubscriber(subscriber)"
-                >
-                  استعراض
-                </VBtn>
-              </td>
-            </tr>
+    <AppDataTableServer
+      :table="table"
+      :headers="headers"
+      title="قائمة المشتركين"
+      icon="tabler-users"
+      search-placeholder="ابحث بالاسم أو الهاتف…"
+      add-label="إضافة مشترك"
+      empty-text="لا يوجد مشتركون مسجلون بعد."
+      empty-icon="tabler-user-off"
+      @add="isAddDialogVisible = true"
+    >
+      <template #item.name="{ item }">
+        <div class="d-flex align-center gap-3">
+          <VAvatar color="primary" variant="tonal" size="38">
+            <VIcon icon="tabler-user" size="20" />
+          </VAvatar>
+          <span class="font-weight-bold text-high-emphasis">{{ item.name }}</span>
+        </div>
+      </template>
 
-            <tr v-if="subscribers.length === 0 && !isLoading">
-              <td colspan="5" class="text-center py-8 text-muted">
-                لا يوجد مشتركون مسجلون بعد.
-              </td>
-            </tr>
-          </tbody>
-        </VTable>
-      </VCardText>
-    </VCard>
+      <template #item.phone="{ item }">
+        <span dir="ltr" class="d-inline-block">{{ item.phone }}</span>
+      </template>
+
+      <template #item.status="{ item }">
+        <VChip size="small" :color="statusColor(SUBSCRIBER_STATUS, item.status)" variant="tonal">
+          {{ statusLabel(SUBSCRIBER_STATUS, item.status) }}
+        </VChip>
+      </template>
+
+      <template #item.last_activity_at="{ item }">
+        <span class="text-caption">{{ formatDate(item.last_activity_at) }}</span>
+      </template>
+
+      <template #item.created_at="{ item }">
+        <span class="text-caption">{{ formatDate(item.created_at) }}</span>
+      </template>
+
+      <template #item.actions="{ item }">
+        <div class="text-center">
+          <VBtn
+            size="small"
+            variant="tonal"
+            color="primary"
+            prepend-icon="tabler-eye"
+            @click="openSubscriber(item)"
+          >
+            استعراض
+          </VBtn>
+        </div>
+      </template>
+    </AppDataTableServer>
 
     <!-- Add Subscriber Dialog -->
     <VDialog v-model="isAddDialogVisible" max-width="500" @after-leave="resetForm">
       <VCard>
-        <VCardTitle class="pa-4 font-weight-bold">إضافة مشترك جديد</VCardTitle>
+        <VCardTitle class="pa-4 font-weight-bold">
+          إضافة مشترك جديد
+        </VCardTitle>
         <VDivider />
         <VCardText class="pa-4">
           <VRow>
@@ -216,19 +180,19 @@ onMounted(() => {
               <AppSelect
                 v-model="form.status"
                 label="الحالة"
-                :items="[
-                  { title: 'فعال', value: 'ACTIVE' },
-                  { title: 'غير مفعل', value: 'UNVERIFIED' },
-                  { title: 'موقوف', value: 'SUSPENDED' },
-                ]"
+                :items="statusOptions(SUBSCRIBER_STATUS)"
               />
             </VCol>
           </VRow>
         </VCardText>
         <VCardActions class="pa-4">
           <VSpacer />
-          <VBtn variant="tonal" color="secondary" @click="isAddDialogVisible = false">إلغاء</VBtn>
-          <VBtn color="primary" :loading="isSaving" @click="submitAdd">حفظ</VBtn>
+          <VBtn variant="tonal" color="secondary" @click="isAddDialogVisible = false">
+            إلغاء
+          </VBtn>
+          <VBtn color="primary" :loading="isSaving" @click="submitAdd">
+            حفظ
+          </VBtn>
         </VCardActions>
       </VCard>
     </VDialog>

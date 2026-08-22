@@ -4,14 +4,17 @@ namespace App\Http\Resources\Api\V1\Admin;
 
 use App\Http\Resources\Api\V1\AssetResource;
 use App\Http\Resources\Api\V1\AxisResource;
+use App\Http\Resources\Api\V1\LevelResource;
 use App\Http\Resources\Api\V1\SkillResource;
 use App\Http\Resources\Api\V1\UserResource;
-use App\Http\Resources\Api\V1\LevelResource;
+use App\Http\Resources\Concerns\SerializesEnums;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class AdminGameResource extends JsonResource
 {
+    use SerializesEnums;
+
     public function toArray(Request $request): array
     {
         return [
@@ -20,7 +23,7 @@ class AdminGameResource extends JsonResource
             'name' => $this->name,
             'slug' => $this->slug,
             'description' => $this->description,
-            'type' => $this->type?->value ?? (string) $this->type,
+            'type' => $this->enumValue($this->type),
             'axis_id' => $this->axis_id,
             'skill_id' => $this->skill_id,
             'level_id' => $this->level_id,
@@ -32,7 +35,7 @@ class AdminGameResource extends JsonResource
             'min_age' => $this->min_age,
             'max_age' => $this->max_age,
             'duration_seconds' => $this->duration_seconds,
-            'status' => $this->status?->value ?? (string) $this->status,
+            'status' => $this->enumValue($this->status),
             'version' => $this->version,
             'config' => $this->config,
             'assets' => AssetResource::collection($this->whenLoaded('assets')),

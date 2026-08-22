@@ -25,7 +25,7 @@ class LottieValidationService
         $decoded = json_decode($content, true);
 
         if (json_last_error() !== JSON_ERROR_NONE || ! is_array($decoded)) {
-            throw new InvalidLottieFileException('الملف المرفق ليس بصيغة JSON صالحة: '.json_last_error_msg());
+            throw new InvalidLottieFileException('الملف المرفق ليس بصيغة JSON صالحة.');
         }
 
         $requiredKeys = config('media.lottie_required_keys', ['v', 'fr', 'ip', 'op', 'w', 'h', 'layers']);

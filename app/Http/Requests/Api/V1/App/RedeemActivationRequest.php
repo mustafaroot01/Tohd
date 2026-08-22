@@ -17,12 +17,4 @@ class RedeemActivationRequest extends FormRequest
             'code' => ['required', 'string', 'min:8', 'max:64'],
         ];
     }
-
-    public function messages(): array
-    {
-        return [
-            'code.required' => 'حقل كود التفعيل إلزامي.',
-            'code.string' => 'صيغة كود التفعيل غير صحيحة.',
-        ];
-    }
 }

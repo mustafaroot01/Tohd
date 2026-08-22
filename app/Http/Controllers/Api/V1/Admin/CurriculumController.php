@@ -23,6 +23,7 @@ use App\Models\CurriculumMonth;
 use App\Models\CurriculumWeek;
 use App\Models\Game;
 use App\Support\ApiResponse;
+use App\Support\TableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -31,31 +32,20 @@ class CurriculumController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $perPage = min((int) $request->input('per_page', 20), 100);
-        $query = Curriculum::withCount('months')->latest();
+        $query = Curriculum::withCount('months');
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->input('status'));
-        }
+        TableQuery::filters($query, $request, ['status']);
 
-        if ($request->filled('search')) {
-            $search = $request->input('search');
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('code', 'like', "%{$search}%");
-            });
-        }
+        TableQuery::search($query, $request, ['name', 'code']);
 
-        $curriculums = $query->paginate($perPage);
+        TableQuery::sort($query, $request, ['name', 'code', 'status', 'version', 'published_at', 'created_at'], 'created_at');
+
+        $curriculums = $query->paginate(TableQuery::perPage($request));
 
         return ApiResponse::success(
             data: AdminCurriculumResource::collection($curriculums),
             message: 'تم استرجاع قائمة المناهج بنجاح',
-            meta: [
-                'current_page' => $curriculums->currentPage(),
-                'per_page' => $curriculums->perPage(),
-                'total' => $curriculums->total(),
-            ]
+            meta: TableQuery::meta($curriculums)
         );
     }
 
@@ -135,7 +125,11 @@ class CurriculumController extends Controller
     public function addDay(StoreCurriculumDayRequest $request, CurriculumWeek $week, AddDayAction $action): JsonResponse
     {
         if ($week->days()->count() >= 7) {
-            return ApiResponse::error('لا يمكن إضافة أكثر من 7 أيام في الأسبوع الواحد.', Response::HTTP_UNPROCESSABLE_ENTITY);
+            return ApiResponse::error(
+                message: 'لا يمكن إضافة أكثر من 7 أيام في الأسبوع الواحد.',
+                errorCode: 'WEEK_DAYS_LIMIT_REACHED',
+                status: Response::HTTP_UNPROCESSABLE_ENTITY
+            );
         }
 
         $day = $action->execute($week, $request->validated());

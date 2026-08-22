@@ -21,24 +21,6 @@ const cancelReason = ref('')
 const assignmentToCancel = ref<any | null>(null)
 const isCancelling = ref(false)
 
-const statusLabel = (status: string) => {
-  if (status === 'ACTIVE')
-    return 'فعال'
-  if (status === 'SUSPENDED')
-    return 'موقوف'
-
-  return 'غير مفعل'
-}
-
-const statusColor = (status: string) => {
-  if (status === 'ACTIVE')
-    return 'success'
-  if (status === 'SUSPENDED')
-    return 'error'
-
-  return 'warning'
-}
-
 const assignmentStatusLabel = (status: string): string => {
   const map: Record<string, string> = {
     ACTIVE: 'فعال',
@@ -63,7 +45,6 @@ const assignmentStatusColor = (status: string): string => {
   return map[status] ?? 'secondary'
 }
 
-const formatDate = (value: string | null) => value ? new Date(value).toLocaleString('ar-SA') : '-'
 
 const fetchSubscriber = async () => {
   isLoading.value = true
@@ -180,8 +161,8 @@ onMounted(() => {
         <div>
           <h2 class="text-h4 font-weight-bold d-flex align-center gap-3">
             {{ subscriber.name }}
-            <VChip size="small" :color="statusColor(subscriber.status)" variant="tonal">
-              {{ statusLabel(subscriber.status) }}
+            <VChip size="small" :color="statusColor(SUBSCRIBER_STATUS, subscriber.status)" variant="tonal">
+              {{ statusLabel(SUBSCRIBER_STATUS, subscriber.status) }}
             </VChip>
           </h2>
           <p class="text-muted mb-0" dir="ltr">{{ subscriber.phone }}</p>
@@ -216,15 +197,15 @@ onMounted(() => {
               </VCol>
               <VCol cols="6" md="3">
                 <div class="text-caption text-muted">تاريخ التسجيل</div>
-                <div class="font-weight-medium">{{ formatDate(subscriber.created_at) }}</div>
+                <div class="font-weight-medium">{{ formatDateTime(subscriber.created_at) }}</div>
               </VCol>
               <VCol cols="6" md="3">
                 <div class="text-caption text-muted">آخر تسجيل دخول</div>
-                <div class="font-weight-medium">{{ formatDate(subscriber.last_login_at) }}</div>
+                <div class="font-weight-medium">{{ formatDateTime(subscriber.last_login_at) }}</div>
               </VCol>
               <VCol cols="6" md="3">
                 <div class="text-caption text-muted">آخر نشاط</div>
-                <div class="font-weight-medium">{{ formatDate(subscriber.last_activity_at) }}</div>
+                <div class="font-weight-medium">{{ formatDateTime(subscriber.last_activity_at) }}</div>
               </VCol>
             </VRow>
           </VCardText>
@@ -246,7 +227,7 @@ onMounted(() => {
               </VCol>
               <VCol cols="6" md="3">
                 <div class="text-caption text-muted">تاريخ الانتهاء</div>
-                <div class="font-weight-medium">{{ formatDate(subscriber.current_subscription.ends_at) }}</div>
+                <div class="font-weight-medium">{{ formatDateTime(subscriber.current_subscription.ends_at) }}</div>
               </VCol>
               <VCol cols="6" md="3">
                 <div class="text-caption text-muted">الأيام المتبقية</div>
@@ -279,8 +260,8 @@ onMounted(() => {
                 <tr v-for="assignment in subscriber.subscription_history" :key="assignment.id">
                   <td>{{ assignment.curriculum?.name || '-' }}</td>
                   <td dir="ltr">{{ assignment.serial || '-' }}</td>
-                  <td>{{ formatDate(assignment.starts_at) }}</td>
-                  <td>{{ formatDate(assignment.ends_at) }}</td>
+                  <td>{{ formatDateTime(assignment.starts_at) }}</td>
+                  <td>{{ formatDateTime(assignment.ends_at) }}</td>
                   <td>
                     <VChip size="small" :color="assignmentStatusColor(assignment.status)" variant="tonal">
                       {{ assignmentStatusLabel(assignment.status) }}
@@ -324,7 +305,7 @@ onMounted(() => {
                 <tr v-for="serial in subscriber.serial_history" :key="serial.id">
                   <td dir="ltr">{{ serial.code }}</td>
                   <td>{{ serial.product?.name || '-' }}</td>
-                  <td>{{ formatDate(serial.activated_at) }}</td>
+                  <td>{{ formatDateTime(serial.activated_at) }}</td>
                   <td>
                     <VChip size="small" color="primary" variant="tonal">{{ serial.status }}</VChip>
                   </td>
@@ -374,7 +355,7 @@ onMounted(() => {
                   <td>
                     <VChip size="small" color="secondary" variant="tonal">{{ session.status }}</VChip>
                   </td>
-                  <td>{{ formatDate(session.started_at) }}</td>
+                  <td>{{ formatDateTime(session.started_at) }}</td>
                 </tr>
                 <tr v-if="!subscriber.sessions?.length">
                   <td colspan="5" class="text-center py-6 text-muted">لا يوجد جلسات بعد.</td>
@@ -421,7 +402,7 @@ onMounted(() => {
               <VTimelineItem v-for="(activity, index) in subscriber.activity_timeline" :key="index" dot-color="primary" size="x-small">
                 <div class="d-flex justify-space-between align-center gap-2 flex-wrap mb-1">
                   <span class="font-weight-medium">{{ activity.label }}</span>
-                  <span class="text-caption text-muted">{{ formatDate(activity.created_at) }}</span>
+                  <span class="text-caption text-muted">{{ formatDateTime(activity.created_at) }}</span>
                 </div>
               </VTimelineItem>
             </VTimeline>

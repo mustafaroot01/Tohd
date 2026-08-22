@@ -20,17 +20,7 @@ export const { themeConfig, layoutConfig } = defineThemeConfig({
       defaultLocale: 'ar',
       langConfig: [
         {
-          label: 'English',
-          i18nLang: 'en',
-          isRTL: false,
-        },
-        {
-          label: 'French',
-          i18nLang: 'fr',
-          isRTL: false,
-        },
-        {
-          label: 'Arabic',
+          label: 'العربية',
           i18nLang: 'ar',
           isRTL: true,
         },

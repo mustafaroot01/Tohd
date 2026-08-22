@@ -40,11 +40,8 @@ const getAbsoluteUrl = (url: string) => {
     }
   }
 
-  // Fallback to local Laravel serve port 8000 if running locally on Vite port (5173 / 3000)
-  if (window.location.port === '5173' || window.location.port === '3000') {
-    return `http://localhost:8000${url.startsWith('/') ? '' : '/'}${url}`
-  }
-
+  // The app is served by Laravel, so same-origin is always right. The old code
+  // hard-coded port 8000, which broke the moment the server ran on any other port.
   return `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`
 }
 

@@ -19,11 +19,4 @@ class ResendOtpRequest extends FormRequest
             'purpose' => ['nullable', 'string', Rule::in(['PHONE_VERIFICATION', 'PASSWORD_RESET'])],
         ];
     }
-
-    public function messages(): array
-    {
-        return [
-            'phone.required' => 'حقل رقم الهاتف مطلوب.',
-        ];
-    }
 }

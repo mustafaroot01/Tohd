@@ -8,6 +8,7 @@ use App\Http\Requests\Api\V1\Admin\UpdateSkillRequest;
 use App\Http\Resources\Api\V1\SkillResource;
 use App\Models\Skill;
 use App\Support\ApiResponse;
+use App\Support\TableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -17,28 +18,20 @@ class SkillController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $perPage = min((int) $request->input('per_page', 20), 100);
-        $query = Skill::with('axis')->withCount('games')->orderBy('sort_order');
+        $query = Skill::with('axis')->withCount('games');
 
-        if ($request->filled('axis_id')) {
-            $query->where('axis_id', $request->input('axis_id'));
-        }
+        TableQuery::filters($query, $request, ['axis_id', 'status']);
 
-        if ($request->filled('search')) {
-            $search = $request->input('search');
-            $query->where('name', 'like', "%{$search}%")->orWhere('slug', 'like', "%{$search}%");
-        }
+        TableQuery::search($query, $request, ['name', 'slug']);
 
-        $skills = $query->paginate($perPage);
+        TableQuery::sort($query, $request, ['name', 'slug', 'status', 'sort_order', 'created_at'], 'sort_order', 'asc');
+
+        $skills = $query->paginate(TableQuery::perPage($request));
 
         return ApiResponse::success(
             data: SkillResource::collection($skills),
             message: 'تم استرجاع قائمة المهارات بنجاح',
-            meta: [
-                'current_page' => $skills->currentPage(),
-                'per_page' => $skills->perPage(),
-                'total' => $skills->total(),
-            ]
+            meta: TableQuery::meta($skills)
         );
     }
 

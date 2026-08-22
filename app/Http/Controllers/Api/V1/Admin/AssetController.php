@@ -2,14 +2,14 @@
 
 namespace App\Http\Controllers\Api\V1\Admin;
 
-use App\Actions\Assets\UploadAssetAction;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Api\V1\Admin\UploadAssetRequest;
 use App\Http\Requests\Api\V1\Admin\UpdateAssetRequest;
+use App\Http\Requests\Api\V1\Admin\UploadAssetRequest;
 use App\Http\Resources\Api\V1\AssetResource;
 use App\Models\Asset;
 use App\Services\AssetStorageService;
 use App\Support\ApiResponse;
+use App\Support\TableQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -18,31 +18,20 @@ class AssetController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $perPage = min((int) $request->input('per_page', 20), 100);
-        $query = Asset::latest();
+        $query = Asset::query();
 
-        if ($request->filled('type')) {
-            $query->where('type', $request->input('type'));
-        }
+        TableQuery::filters($query, $request, ['type', 'status']);
 
-        if ($request->filled('search')) {
-            $search = $request->input('search');
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('code', 'like', "%{$search}%");
-            });
-        }
+        TableQuery::search($query, $request, ['name', 'code']);
 
-        $assets = $query->paginate($perPage);
+        TableQuery::sort($query, $request, ['name', 'code', 'type', 'size', 'status', 'created_at'], 'created_at');
+
+        $assets = $query->paginate(TableQuery::perPage($request));
 
         return ApiResponse::success(
             data: AssetResource::collection($assets),
             message: 'تم استرجاع قائمة الوسائط بنجاح',
-            meta: [
-                'current_page' => $assets->currentPage(),
-                'per_page' => $assets->perPage(),
-                'total' => $assets->total(),
-            ]
+            meta: TableQuery::meta($assets)
         );
     }
 
@@ -93,4 +82,3 @@ class AssetController extends Controller
         );
     }
 }
-

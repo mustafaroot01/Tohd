@@ -3,26 +3,19 @@
 namespace App\Http\Requests\Api\V1\Admin;
 
 use App\Enums\SubscriberStatus;
+use App\Http\Requests\Concerns\NormalizesPhone;
 use App\Rules\PhoneNumberRule;
-use App\Support\PhoneNumber;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 
 class UpdateSubscriberRequest extends FormRequest
 {
+    use NormalizesPhone;
+
     public function authorize(): bool
     {
         return true;
-    }
-
-    protected function prepareForValidation(): void
-    {
-        if ($this->filled('phone')) {
-            $this->merge([
-                'phone' => PhoneNumber::normalize($this->input('phone')) ?? $this->input('phone'),
-            ]);
-        }
     }
 
     public function rules(): array

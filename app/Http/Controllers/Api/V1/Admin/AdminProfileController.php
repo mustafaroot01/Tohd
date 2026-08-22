@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
+use Symfony\Component\HttpFoundation\Response;
 
 class AdminProfileController extends Controller
 {
@@ -18,12 +19,12 @@ class AdminProfileController extends Controller
 
         return ApiResponse::success(
             data: [
-                'id'            => $user->id,
-                'name'          => $user->name,
-                'email'         => $user->email,
-                'status'        => $user->status,
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'status' => $user->status,
                 'last_login_at' => $user->last_login_at,
-                'created_at'    => $user->created_at,
+                'created_at' => $user->created_at,
             ],
             message: 'تم استرجاع بيانات الحساب بنجاح'
         );
@@ -34,16 +35,20 @@ class AdminProfileController extends Controller
         $user = $request->user();
 
         $validated = $request->validate([
-            'name'                  => ['required', 'string', 'max:255'],
-            'email'                 => ['required', 'email', Rule::unique('users', 'email')->ignore($user->id)],
-            'current_password'      => ['nullable', 'string'],
-            'password'              => ['nullable', 'confirmed', Password::min(8)],
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', Rule::unique('users', 'email')->ignore($user->id)],
+            'current_password' => ['nullable', 'string'],
+            'password' => ['nullable', 'confirmed', Password::min(8)],
         ]);
 
         // Verify current password if changing password
-        if (!empty($validated['password'])) {
-            if (empty($validated['current_password']) || !Hash::check($validated['current_password'], $user->password)) {
-                return ApiResponse::error('كلمة المرور الحالية غير صحيحة', 422);
+        if (! empty($validated['password'])) {
+            if (empty($validated['current_password']) || ! Hash::check($validated['current_password'], $user->password)) {
+                return ApiResponse::error(
+                    message: 'كلمة المرور الحالية غير صحيحة',
+                    errorCode: 'INVALID_CURRENT_PASSWORD',
+                    status: Response::HTTP_UNPROCESSABLE_ENTITY
+                );
             }
             $validated['password'] = Hash::make($validated['password']);
         } else {
@@ -56,8 +61,8 @@ class AdminProfileController extends Controller
 
         return ApiResponse::success(
             data: [
-                'id'    => $user->id,
-                'name'  => $user->name,
+                'id' => $user->id,
+                'name' => $user->name,
                 'email' => $user->email,
             ],
             message: 'تم تحديث بيانات الحساب بنجاح'

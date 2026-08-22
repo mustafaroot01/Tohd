@@ -7,9 +7,18 @@
 export {}
 declare global {
   const $api: typeof import('./resources/ts/utils/api')['$api']
+  const ACTIVATION_STATUS: typeof import('./resources/ts/utils/statuses')['ACTIVATION_STATUS']
+  const ASSET_TYPE: typeof import('./resources/ts/utils/statuses')['ASSET_TYPE']
+  const ASSIGNMENT_STATUS: typeof import('./resources/ts/utils/statuses')['ASSIGNMENT_STATUS']
   const COOKIE_MAX_AGE_1_YEAR: typeof import('./resources/ts/utils/constants')['COOKIE_MAX_AGE_1_YEAR']
+  const CURRICULUM_STATUS: typeof import('./resources/ts/utils/statuses')['CURRICULUM_STATUS']
   const CreateUrl: typeof import('./src/@core/composable/CreateUrl')['CreateUrl']
   const EffectScope: typeof import('vue')['EffectScope']
+  const GAME_DIFFICULTY: typeof import('./resources/ts/utils/statuses')['GAME_DIFFICULTY']
+  const GAME_STATUS: typeof import('./resources/ts/utils/statuses')['GAME_STATUS']
+  const PRODUCT_STATUS: typeof import('./resources/ts/utils/statuses')['PRODUCT_STATUS']
+  const SUBSCRIBER_STATUS: typeof import('./resources/ts/utils/statuses')['SUBSCRIBER_STATUS']
+  const USER_STATUS: typeof import('./resources/ts/utils/statuses')['USER_STATUS']
   const acceptHMRUpdate: typeof import('pinia')['acceptHMRUpdate']
   const alphaDashValidator: typeof import('./resources/ts/@core/utils/validators')['alphaDashValidator']
   const alphaValidator: typeof import('./resources/ts/@core/utils/validators')['alphaValidator']
@@ -50,8 +59,11 @@ declare global {
   const effectScope: typeof import('vue')['effectScope']
   const emailValidator: typeof import('./resources/ts/@core/utils/validators')['emailValidator']
   const extendRef: typeof import('@vueuse/core')['extendRef']
-  const formatDate: typeof import('./resources/ts/@core/utils/formatters')['formatDate']
+  const formatBytes: typeof import('./resources/ts/utils/formatters')['formatBytes']
+  const formatDate: typeof import('./resources/ts/utils/formatters')['formatDate']
+  const formatDateTime: typeof import('./resources/ts/utils/formatters')['formatDateTime']
   const formatDateToMonthShort: typeof import('./resources/ts/@core/utils/formatters')['formatDateToMonthShort']
+  const formatNumber: typeof import('./resources/ts/utils/formatters')['formatNumber']
   const getActivePinia: typeof import('pinia')['getActivePinia']
   const getCurrentInstance: typeof import('vue')['getCurrentInstance']
   const getCurrentScope: typeof import('vue')['getCurrentScope']
@@ -138,6 +150,9 @@ declare global {
   const shallowReactive: typeof import('vue')['shallowReactive']
   const shallowReadonly: typeof import('vue')['shallowReadonly']
   const shallowRef: typeof import('vue')['shallowRef']
+  const statusColor: typeof import('./resources/ts/utils/statuses')['statusColor']
+  const statusLabel: typeof import('./resources/ts/utils/statuses')['statusLabel']
+  const statusOptions: typeof import('./resources/ts/utils/statuses')['statusOptions']
   const storeToRefs: typeof import('pinia')['storeToRefs']
   const syncRef: typeof import('@vueuse/core')['syncRef']
   const syncRefs: typeof import('@vueuse/core')['syncRefs']
@@ -265,6 +280,7 @@ declare global {
   const useMutationObserver: typeof import('@vueuse/core')['useMutationObserver']
   const useNavigatorLanguage: typeof import('@vueuse/core')['useNavigatorLanguage']
   const useNetwork: typeof import('@vueuse/core')['useNetwork']
+  const useNotification: typeof import('./resources/ts/composables/useNotification')['useNotification']
   const useNow: typeof import('@vueuse/core')['useNow']
   const useObjectUrl: typeof import('@vueuse/core')['useObjectUrl']
   const useOffsetPagination: typeof import('@vueuse/core')['useOffsetPagination']
@@ -297,6 +313,7 @@ declare global {
   const useScriptTag: typeof import('@vueuse/core')['useScriptTag']
   const useScroll: typeof import('@vueuse/core')['useScroll']
   const useScrollLock: typeof import('@vueuse/core')['useScrollLock']
+  const useServerTable: typeof import('./resources/ts/composables/useServerTable')['useServerTable']
   const useSessionStorage: typeof import('@vueuse/core')['useSessionStorage']
   const useShare: typeof import('@vueuse/core')['useShare']
   const useSkins: typeof import('./resources/ts/@core/composable/useSkins')['useSkins']
@@ -376,8 +393,17 @@ declare module 'vue' {
   interface GlobalComponents {}
   interface ComponentCustomProperties {
     readonly $api: UnwrapRef<typeof import('./resources/ts/utils/api')['$api']>
+    readonly ACTIVATION_STATUS: UnwrapRef<typeof import('./resources/ts/utils/statuses')['ACTIVATION_STATUS']>
+    readonly ASSET_TYPE: UnwrapRef<typeof import('./resources/ts/utils/statuses')['ASSET_TYPE']>
+    readonly ASSIGNMENT_STATUS: UnwrapRef<typeof import('./resources/ts/utils/statuses')['ASSIGNMENT_STATUS']>
     readonly COOKIE_MAX_AGE_1_YEAR: UnwrapRef<typeof import('./resources/ts/utils/constants')['COOKIE_MAX_AGE_1_YEAR']>
+    readonly CURRICULUM_STATUS: UnwrapRef<typeof import('./resources/ts/utils/statuses')['CURRICULUM_STATUS']>
     readonly EffectScope: UnwrapRef<typeof import('vue')['EffectScope']>
+    readonly GAME_DIFFICULTY: UnwrapRef<typeof import('./resources/ts/utils/statuses')['GAME_DIFFICULTY']>
+    readonly GAME_STATUS: UnwrapRef<typeof import('./resources/ts/utils/statuses')['GAME_STATUS']>
+    readonly PRODUCT_STATUS: UnwrapRef<typeof import('./resources/ts/utils/statuses')['PRODUCT_STATUS']>
+    readonly SUBSCRIBER_STATUS: UnwrapRef<typeof import('./resources/ts/utils/statuses')['SUBSCRIBER_STATUS']>
+    readonly USER_STATUS: UnwrapRef<typeof import('./resources/ts/utils/statuses')['USER_STATUS']>
     readonly acceptHMRUpdate: UnwrapRef<typeof import('pinia')['acceptHMRUpdate']>
     readonly alphaDashValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['alphaDashValidator']>
     readonly alphaValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['alphaValidator']>
@@ -417,8 +443,11 @@ declare module 'vue' {
     readonly effectScope: UnwrapRef<typeof import('vue')['effectScope']>
     readonly emailValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['emailValidator']>
     readonly extendRef: UnwrapRef<typeof import('@vueuse/core')['extendRef']>
-    readonly formatDate: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['formatDate']>
+    readonly formatBytes: UnwrapRef<typeof import('./resources/ts/utils/formatters')['formatBytes']>
+    readonly formatDate: UnwrapRef<typeof import('./resources/ts/utils/formatters')['formatDate']>
+    readonly formatDateTime: UnwrapRef<typeof import('./resources/ts/utils/formatters')['formatDateTime']>
     readonly formatDateToMonthShort: UnwrapRef<typeof import('./resources/ts/@core/utils/formatters')['formatDateToMonthShort']>
+    readonly formatNumber: UnwrapRef<typeof import('./resources/ts/utils/formatters')['formatNumber']>
     readonly getActivePinia: UnwrapRef<typeof import('pinia')['getActivePinia']>
     readonly getCurrentInstance: UnwrapRef<typeof import('vue')['getCurrentInstance']>
     readonly getCurrentScope: UnwrapRef<typeof import('vue')['getCurrentScope']>
@@ -503,6 +532,9 @@ declare module 'vue' {
     readonly shallowReactive: UnwrapRef<typeof import('vue')['shallowReactive']>
     readonly shallowReadonly: UnwrapRef<typeof import('vue')['shallowReadonly']>
     readonly shallowRef: UnwrapRef<typeof import('vue')['shallowRef']>
+    readonly statusColor: UnwrapRef<typeof import('./resources/ts/utils/statuses')['statusColor']>
+    readonly statusLabel: UnwrapRef<typeof import('./resources/ts/utils/statuses')['statusLabel']>
+    readonly statusOptions: UnwrapRef<typeof import('./resources/ts/utils/statuses')['statusOptions']>
     readonly storeToRefs: UnwrapRef<typeof import('pinia')['storeToRefs']>
     readonly syncRef: UnwrapRef<typeof import('@vueuse/core')['syncRef']>
     readonly syncRefs: UnwrapRef<typeof import('@vueuse/core')['syncRefs']>
@@ -628,6 +660,7 @@ declare module 'vue' {
     readonly useMutationObserver: UnwrapRef<typeof import('@vueuse/core')['useMutationObserver']>
     readonly useNavigatorLanguage: UnwrapRef<typeof import('@vueuse/core')['useNavigatorLanguage']>
     readonly useNetwork: UnwrapRef<typeof import('@vueuse/core')['useNetwork']>
+    readonly useNotification: UnwrapRef<typeof import('./resources/ts/composables/useNotification')['useNotification']>
     readonly useNow: UnwrapRef<typeof import('@vueuse/core')['useNow']>
     readonly useObjectUrl: UnwrapRef<typeof import('@vueuse/core')['useObjectUrl']>
     readonly useOffsetPagination: UnwrapRef<typeof import('@vueuse/core')['useOffsetPagination']>
@@ -660,6 +693,7 @@ declare module 'vue' {
     readonly useScriptTag: UnwrapRef<typeof import('@vueuse/core')['useScriptTag']>
     readonly useScroll: UnwrapRef<typeof import('@vueuse/core')['useScroll']>
     readonly useScrollLock: UnwrapRef<typeof import('@vueuse/core')['useScrollLock']>
+    readonly useServerTable: UnwrapRef<typeof import('./resources/ts/composables/useServerTable')['useServerTable']>
     readonly useSessionStorage: UnwrapRef<typeof import('@vueuse/core')['useSessionStorage']>
     readonly useShare: UnwrapRef<typeof import('@vueuse/core')['useShare']>
     readonly useSkins: UnwrapRef<typeof import('./resources/ts/@core/composable/useSkins')['useSkins']>

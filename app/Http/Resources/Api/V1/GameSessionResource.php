@@ -2,11 +2,14 @@
 
 namespace App\Http\Resources\Api\V1;
 
+use App\Http\Resources\Concerns\SerializesEnums;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class GameSessionResource extends JsonResource
 {
+    use SerializesEnums;
+
     public function toArray(Request $request): array
     {
         return [
@@ -24,9 +27,10 @@ class GameSessionResource extends JsonResource
             'incorrect_attempts' => $this->incorrect_attempts,
             'score' => $this->score,
             'accuracy' => (float) $this->accuracy,
-            'status' => $this->status?->value ?? (string) $this->status,
+            'status' => $this->enumValue($this->status),
             'metadata' => $this->metadata,
             'created_at' => $this->created_at?->toISOString(),
+            'updated_at' => $this->updated_at?->toISOString(),
         ];
     }
 }

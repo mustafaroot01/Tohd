@@ -10,6 +10,7 @@ use App\Http\Resources\Api\V1\ActivationCodeResource;
 use App\Models\ActivationCode;
 use App\Models\Product;
 use App\Support\ApiResponse;
+use App\Support\TableQuery;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,32 +20,20 @@ class ActivationCodeController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $perPage = min((int) $request->input('per_page', 20), 100);
-        $query = ActivationCode::with(['product', 'user'])->latest();
+        $query = ActivationCode::with(['product', 'user']);
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->input('status'));
-        }
+        TableQuery::filters($query, $request, ['status', 'product_id']);
 
-        if ($request->filled('product_id')) {
-            $query->where('product_id', $request->input('product_id'));
-        }
+        TableQuery::search($query, $request, ['code']);
 
-        if ($request->filled('search')) {
-            $search = $request->input('search');
-            $query->where('code', 'like', "%{$search}%");
-        }
+        TableQuery::sort($query, $request, ['code', 'status', 'activated_at', 'expires_at', 'created_at'], 'created_at');
 
-        $codes = $query->paginate($perPage);
+        $codes = $query->paginate(TableQuery::perPage($request));
 
         return ApiResponse::success(
             data: ActivationCodeResource::collection($codes),
             message: 'تم استرجاع قائمة أكواد التفعيل بنجاح',
-            meta: [
-                'current_page' => $codes->currentPage(),
-                'per_page' => $codes->perPage(),
-                'total' => $codes->total(),
-            ]
+            meta: TableQuery::meta($codes)
         );
     }
 

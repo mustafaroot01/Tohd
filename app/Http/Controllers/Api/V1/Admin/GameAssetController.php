@@ -24,15 +24,15 @@ class GameAssetController extends Controller
 
         $assets = $game->assets->map(function ($asset) {
             return [
-                'id'         => $asset->id,
-                'code'       => $asset->code,
-                'name'       => $asset->name,
-                'type'       => $asset->type?->value ?? (string) $asset->type,
-                'mime_type'  => $asset->mime_type,
-                'url'        => $asset->url,
-                'role'       => $asset->pivot?->role?->value ?? $asset->pivot?->role,
+                'id' => $asset->id,
+                'code' => $asset->code,
+                'name' => $asset->name,
+                'type' => $asset->type?->value ?? (string) $asset->type,
+                'mime_type' => $asset->mime_type,
+                'url' => $asset->url,
+                'role' => $asset->pivot?->role?->value ?? $asset->pivot?->role,
                 'sort_order' => $asset->pivot?->sort_order,
-                'metadata'   => $asset->pivot?->metadata,
+                'metadata' => $asset->pivot?->metadata,
             ];
         });
 
@@ -48,10 +48,10 @@ class GameAssetController extends Controller
     public function attach(Request $request, Game $game): JsonResponse
     {
         $validated = $request->validate([
-            'asset_id'   => ['required', 'uuid', 'exists:assets,id'],
-            'role'       => ['required', 'string', 'in:' . implode(',', array_column(AssetRole::cases(), 'value'))],
+            'asset_id' => ['required', 'uuid', 'exists:assets,id'],
+            'role' => ['required', 'string', 'in:'.implode(',', array_column(AssetRole::cases(), 'value'))],
             'sort_order' => ['nullable', 'integer', 'min:0'],
-            'metadata'   => ['nullable', 'array'],
+            'metadata' => ['nullable', 'array'],
         ]);
 
         // Prevent duplicate attachment of same asset+role
@@ -61,15 +61,19 @@ class GameAssetController extends Controller
             ->first();
 
         if ($existing) {
-            return ApiResponse::error('هذا الملف مرتبط باللعبة بنفس الدور مسبقاً', Response::HTTP_UNPROCESSABLE_ENTITY);
+            return ApiResponse::error(
+                message: 'هذا الملف مرتبط باللعبة بنفس الدور مسبقاً',
+                errorCode: 'GAME_ASSET_ALREADY_LINKED',
+                status: Response::HTTP_UNPROCESSABLE_ENTITY
+            );
         }
 
         $gameAsset = GameAsset::create([
-            'game_id'    => $game->id,
-            'asset_id'   => $validated['asset_id'],
-            'role'       => $validated['role'],
+            'game_id' => $game->id,
+            'asset_id' => $validated['asset_id'],
+            'role' => $validated['role'],
             'sort_order' => $validated['sort_order'] ?? 0,
-            'metadata'   => $validated['metadata'] ?? null,
+            'metadata' => $validated['metadata'] ?? null,
         ]);
 
         $asset = Asset::find($validated['asset_id']);
@@ -77,9 +81,9 @@ class GameAssetController extends Controller
         return ApiResponse::success(
             data: [
                 'game_asset_id' => $gameAsset->id,
-                'asset'         => new AssetResource($asset),
-                'role'          => $gameAsset->role?->value ?? $gameAsset->role,
-                'sort_order'    => $gameAsset->sort_order,
+                'asset' => new AssetResource($asset),
+                'role' => $gameAsset->role?->value ?? $gameAsset->role,
+                'sort_order' => $gameAsset->sort_order,
             ],
             message: 'تم ربط الملف باللعبة بنجاح',
             status: Response::HTTP_CREATED
@@ -92,9 +96,9 @@ class GameAssetController extends Controller
     public function updateRole(Request $request, Game $game, GameAsset $gameAsset): JsonResponse
     {
         $validated = $request->validate([
-            'role'       => ['sometimes', 'string', 'in:' . implode(',', array_column(AssetRole::cases(), 'value'))],
+            'role' => ['sometimes', 'string', 'in:'.implode(',', array_column(AssetRole::cases(), 'value'))],
             'sort_order' => ['sometimes', 'integer', 'min:0'],
-            'metadata'   => ['nullable', 'array'],
+            'metadata' => ['nullable', 'array'],
         ]);
 
         $gameAsset->update($validated);
@@ -102,8 +106,8 @@ class GameAssetController extends Controller
         return ApiResponse::success(
             data: [
                 'game_asset_id' => $gameAsset->id,
-                'role'          => $gameAsset->fresh()->role?->value ?? $gameAsset->fresh()->role,
-                'sort_order'    => $gameAsset->fresh()->sort_order,
+                'role' => $gameAsset->fresh()->role?->value ?? $gameAsset->fresh()->role,
+                'sort_order' => $gameAsset->fresh()->sort_order,
             ],
             message: 'تم تحديث دور الملف بنجاح'
         );
@@ -115,7 +119,11 @@ class GameAssetController extends Controller
     public function detach(Game $game, GameAsset $gameAsset): JsonResponse
     {
         if ($gameAsset->game_id !== $game->id) {
-            return ApiResponse::error('هذا الملف غير مرتبط بهذه اللعبة', Response::HTTP_NOT_FOUND);
+            return ApiResponse::error(
+                message: 'هذا الملف غير مرتبط بهذه اللعبة',
+                errorCode: 'GAME_ASSET_NOT_LINKED',
+                status: Response::HTTP_NOT_FOUND
+            );
         }
 
         $gameAsset->delete();

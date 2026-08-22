@@ -6,10 +6,10 @@
 /**
  * you need to import the some interfaces
  */
-import en from '@/plugins/i18n/locales/en.json';
+import ar from '@/plugins/i18n/locales/ar.json';
 import 'vue-i18n';
 
-type LocaleMessage = typeof en
+type LocaleMessage = typeof ar
 
 declare module 'vue-i18n' { 
   export interface DefineLocaleMessage extends LocaleMessage {

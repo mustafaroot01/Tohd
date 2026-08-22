@@ -18,12 +18,4 @@ class VerifyOtpRequest extends FormRequest
             'code' => ['required', 'string'],
         ];
     }
-
-    public function messages(): array
-    {
-        return [
-            'phone.required' => 'حقل رقم الهاتف مطلوب.',
-            'code.required' => 'حقل رمز التحقق مطلوب.',
-        ];
-    }
 }

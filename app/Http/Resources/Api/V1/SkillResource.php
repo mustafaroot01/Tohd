@@ -20,6 +20,7 @@ class SkillResource extends JsonResource
             'axis' => new AxisResource($this->whenLoaded('axis')),
             'games_count' => $this->whenCounted('games'),
             'created_at' => $this->created_at?->toISOString(),
+            'updated_at' => $this->updated_at?->toISOString(),
         ];
     }
 }

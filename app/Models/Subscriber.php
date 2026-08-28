@@ -50,6 +50,9 @@ class Subscriber extends Authenticatable
     protected function casts(): array
     {
         return [
+            // replay watermark and attention floor — written by CompleteAttemptAction only
+            'last_attempt_started_us' => 'integer',
+            'last_attempt_completed_us' => 'integer',
             'phone_verified_at' => 'datetime',
             'password' => 'hashed',
             'status' => SubscriberStatus::class,
@@ -87,14 +90,22 @@ class Subscriber extends Authenticatable
             ->latestOfMany();
     }
 
-    public function gameSessions(): HasMany
+    /** The supplementary details gathered after registration, when enabled. */
+    public function profile(): HasOne
     {
-        return $this->hasMany(GameSession::class, 'subscriber_id');
+        return $this->hasOne(SubscriberProfile::class, 'subscriber_id');
     }
 
-    public function skillProgress(): HasMany
+    /** One row per game the child has touched — see SubscriberGameProgress. */
+    public function gameProgress(): HasMany
     {
-        return $this->hasMany(UserSkillProgress::class, 'subscriber_id');
+        return $this->hasMany(SubscriberGameProgress::class, 'subscriber_id');
+    }
+
+    /** One row per (day, game) — the history the weekly report is summed from. */
+    public function gameDays(): HasMany
+    {
+        return $this->hasMany(SubscriberGameDaily::class, 'subscriber_id');
     }
 
     public function activations(): HasMany

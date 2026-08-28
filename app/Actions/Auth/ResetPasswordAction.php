@@ -2,45 +2,46 @@
 
 namespace App\Actions\Auth;
 
-use App\Actions\Otp\VerifyOtpAction;
 use App\Enums\OtpPurpose;
 use App\Enums\SubscriberActivityType;
 use App\Exceptions\DomainException;
 use App\Models\Subscriber;
+use App\Services\OtpService;
 use App\Services\SubscriberActivityLogger;
 use App\Support\PhoneNumber;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
 
+/**
+ * Every existing session dies with the old password, and no new one is
+ * handed out: whoever reset it proves the new password on the login screen.
+ */
 class ResetPasswordAction
 {
     public function __construct(
-        protected VerifyOtpAction $verifyOtp,
-        protected SubscriberActivityLogger $activityLogger
+        protected OtpService $otp,
+        protected SubscriberActivityLogger $activityLogger,
     ) {}
 
-    /**
-     * Verify a password-reset OTP and update the subscriber's password.
-     *
-     * @throws DomainException
-     */
     public function execute(string $phone, string $code, string $newPassword): void
     {
-        $normalizedPhone = PhoneNumber::normalize($phone);
+        $phone = PhoneNumber::normalize($phone);
 
-        $subscriber = Subscriber::where('phone', $normalizedPhone)->first();
-
-        if (! $subscriber) {
-            throw new DomainException('رقم الهاتف غير مسجل في النظام', 'PHONE_NOT_FOUND', 404);
-        }
+        $subscriber = Subscriber::where('phone', $phone)->first()
+            ?? throw ValidationException::withMessages(['phone' => 'لا يوجد حساب بهذا الرقم']);
 
         if ($subscriber->isSuspended()) {
             throw new DomainException('تم إيقاف هذا الحساب، يرجى مراجعة الإدارة', 'ACCOUNT_SUSPENDED', 403);
         }
 
-        $this->verifyOtp->execute($subscriber, $normalizedPhone, $code, OtpPurpose::PASSWORD_RESET);
+        $this->otp->verify($phone, OtpPurpose::RESET, $code);
 
-        $subscriber->update(['password' => Hash::make($newPassword)]);
+        DB::transaction(function () use ($subscriber, $newPassword) {
+            $subscriber->update(['password' => Hash::make($newPassword)]);
+            $subscriber->tokens()->delete();
 
-        $this->activityLogger->log($subscriber, SubscriberActivityType::PASSWORD_RESET);
+            $this->activityLogger->log($subscriber, SubscriberActivityType::PASSWORD_RESET);
+        });
     }
 }

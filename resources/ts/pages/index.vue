@@ -17,9 +17,10 @@ const stats = ref<any>({
   published_games_count: 0,
   curriculums_count: 0,
   published_curriculums_count: 0,
-  today_sessions_count: 0,
-  today_completed_sessions_count: 0,
-  average_accuracy: 0,
+  today_attempts_count: 0,
+  today_passed_count: 0,
+  today_active_subscribers: 0,
+  average_score: null as number | null,
   total_revenue: 0,
   today_activations_count: 0,
   today_revenue: 0,
@@ -247,9 +248,9 @@ onMounted(() => {
               <VIcon icon="tabler-percentage" size="30" />
             </VAvatar>
             <div>
-              <div class="text-caption text-muted font-weight-medium">متوسط دقة الأداء</div>
-              <div class="text-h4 font-weight-bold text-warning">{{ stats.average_accuracy }}%</div>
-              <div class="text-caption text-muted">دقة إجابات الأطفال</div>
+              <div class="text-caption text-muted font-weight-medium">متوسط درجة الانتباه</div>
+              <div class="text-h4 font-weight-bold text-warning">{{ stats.average_score ?? '—' }}<span class="text-body-2 text-muted"> / 10</span></div>
+              <div class="text-caption text-muted">زمن المشاهدة من مدة اللعبة</div>
             </div>
           </VCardText>
         </VCard>
@@ -263,9 +264,9 @@ onMounted(() => {
               <VIcon icon="tabler-activity" size="30" />
             </VAvatar>
             <div>
-              <div class="text-caption text-muted font-weight-medium">جلسات اليوم</div>
-              <div class="text-h4 font-weight-bold text-success">{{ stats.today_sessions_count }}</div>
-              <div class="text-caption text-muted">{{ stats.today_completed_sessions_count }} مكتملة بنجاح</div>
+              <div class="text-caption text-muted font-weight-medium">محاولات اليوم</div>
+              <div class="text-h4 font-weight-bold text-success">{{ stats.today_attempts_count }}</div>
+              <div class="text-caption text-muted">{{ stats.today_passed_count }} لعبة ناجحة · {{ stats.today_active_subscribers }} مشترك</div>
             </div>
           </VCardText>
         </VCard>

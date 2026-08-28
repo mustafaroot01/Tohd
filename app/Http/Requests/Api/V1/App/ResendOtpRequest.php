@@ -2,11 +2,15 @@
 
 namespace App\Http\Requests\Api\V1\App;
 
+use App\Http\Requests\Concerns\NormalizesPhone;
+use App\Rules\PhoneNumberRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
+/** "لم يصلني الرمز": the server works out whether it is a signup or a reset. */
 class ResendOtpRequest extends FormRequest
 {
+    use NormalizesPhone;
+
     public function authorize(): bool
     {
         return true;
@@ -15,8 +19,12 @@ class ResendOtpRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'phone' => ['required', 'string'],
-            'purpose' => ['nullable', 'string', Rule::in(['PHONE_VERIFICATION', 'PASSWORD_RESET'])],
+            'phone' => ['required', 'string', new PhoneNumberRule],
         ];
+    }
+
+    public function messages(): array
+    {
+        return ['phone.required' => 'رقم الهاتف مطلوب'];
     }
 }

@@ -48,9 +48,4 @@ class CurriculumDay extends Model
             ->withTimestamps()
             ->orderByPivot('sort_order');
     }
-
-    public function sessions(): HasMany
-    {
-        return $this->hasMany(GameSession::class);
-    }
 }

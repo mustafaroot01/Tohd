@@ -96,16 +96,22 @@ class SubscriberProfileTest extends TestCase
         $this->assertTrue(Hash::check('a-brand-new-password', $this->subscriber->fresh()->password));
     }
 
-    public function test_changing_the_phone_forces_reverification(): void
+    public function test_the_phone_cannot_be_changed_from_the_app(): void
     {
-        $this->asSubscriber()->putJson('/api/v1/app/profile', ['phone' => '07701238888'])
-            ->assertStatus(200);
+        // the number is the account's identity, proven once at signup — a
+        // self-service change would let anyone park on someone else's number
+        $this->asSubscriber()->putJson('/api/v1/app/profile', ['phone' => '07701238888', 'name' => 'اسم جديد'])
+            ->assertStatus(200)
+            ->assertJsonPath('data.phone', '+9647701239999')
+            ->assertJsonPath('data.name', 'اسم جديد');
 
-        $fresh = $this->subscriber->fresh();
+        $this->assertSame('+9647701239999', $this->subscriber->fresh()->phone);
+        $this->assertSame(0, \App\Models\PhoneVerification::count());
+    }
 
-        $this->assertSame('+9647701238888', $fresh->phone);
-        $this->assertNull($fresh->phone_verified_at);
-        $this->assertSame(SubscriberStatus::UNVERIFIED, $fresh->status);
-        $this->assertNotEmpty($this->fakeSmsGateway()->sent);
+    public function test_the_phone_verify_endpoint_no_longer_exists(): void
+    {
+        $this->asSubscriber()->postJson('/api/v1/app/profile/phone/verify', ['code' => '123456'])
+            ->assertStatus(404);
     }
 }

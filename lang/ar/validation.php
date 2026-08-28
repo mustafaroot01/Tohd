@@ -47,7 +47,7 @@ return [
     'email' => 'صيغة :attribute غير صحيحة.',
     'enum' => ':attribute المحدد غير صالح.',
     'exists' => ':attribute المحدد غير موجود.',
-    'extensions' => 'امتداد الملف :attribute غير مقبول.',
+    'extensions' => 'صيغة :attribute غير مدعومة. الصيغ المقبولة: :values.',
     'file' => 'يجب أن يكون :attribute ملفاً.',
     'filled' => ':attribute مطلوب.',
     'gt' => [
@@ -84,15 +84,15 @@ return [
     ],
     'max' => [
         'array' => 'يجب أن لا يحتوي :attribute على أكثر من :max عنصر.',
-        'file' => 'يجب أن لا يزيد حجم الملف :attribute عن :max كيلوبايت.',
+        'file' => 'يجب أن لا يزيد حجم :attribute عن :max كيلوبايت.',
         'numeric' => 'يجب أن لا تزيد قيمة :attribute عن :max.',
         'string' => 'يجب أن لا يزيد طول النص :attribute عن :max حرف.',
     ],
     'mimes' => 'يجب أن يكون :attribute ملفاً من نوع: :values.',
-    'mimetypes' => 'يجب أن يكون :attribute ملفاً من نوع: :values.',
+    'mimetypes' => 'محتوى :attribute لا يطابق صيغة مدعومة.',
     'min' => [
         'array' => 'يجب أن يحتوي :attribute على :min عنصر على الأقل.',
-        'file' => 'يجب أن يكون حجم الملف :attribute :min كيلوبايت على الأقل.',
+        'file' => 'يجب أن لا يقل حجم :attribute عن :min كيلوبايت.',
         'numeric' => 'يجب أن تكون قيمة :attribute :min على الأقل.',
         'string' => 'يجب أن يكون طول النص :attribute :min أحرف على الأقل.',
     ],

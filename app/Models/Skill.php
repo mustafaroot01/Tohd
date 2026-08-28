@@ -37,9 +37,4 @@ class Skill extends Model
     {
         return $this->hasMany(Game::class);
     }
-
-    public function userProgress(): HasMany
-    {
-        return $this->hasMany(UserSkillProgress::class);
-    }
 }

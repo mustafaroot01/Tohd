@@ -2,7 +2,10 @@
 
 use App\Http\Middleware\EnsureIsAdmin;
 use App\Http\Middleware\EnsureIsSubscriber;
+use App\Http\Middleware\EnsureProfileIsComplete;
 use App\Http\Middleware\ForceJsonResponse;
+use App\Http\Middleware\HideDisabledFeatureRoutes;
+use App\Http\Middleware\RequiresProfileCompletion;
 use App\Support\ApiResponse;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Console\Scheduling\Schedule;
@@ -14,9 +17,9 @@ use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
-use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -35,7 +38,15 @@ return Application::configure(basePath: dirname(__DIR__))
             'subscriber' => EnsureIsSubscriber::class,
             'force.json' => ForceJsonResponse::class,
             'maintenance' => \App\Http\Middleware\CheckMaintenanceMode::class,
+            // the second registration step: one gate hides the feature, the other enforces it
+            'profile.feature' => RequiresProfileCompletion::class,
+            'profile.complete' => EnsureProfileIsComplete::class,
         ]);
+
+        // Runs before routing, so a switched-off feature's URIs answer the same
+        // 404 as any path that was never registered — on every verb, and
+        // whether or not a token was sent.
+        $middleware->append(HideDisabledFeatureRoutes::class);
 
         // This app has no `login` route, so the framework default
         // redirectGuestsTo(route('login')) blew up with a RouteNotFoundException —

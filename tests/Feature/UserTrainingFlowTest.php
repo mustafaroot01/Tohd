@@ -123,16 +123,18 @@ class UserTrainingFlowTest extends TestCase
             'name' => 'فارس الصغير',
             'phone' => '07701239999',
             'password' => 'secret123456',
+            'password_confirmation' => 'secret123456',
         ]);
-        $registerRes->assertStatus(201);
+        $registerRes->assertStatus(201)->assertJsonMissingPath('data.token');
 
-        $otpCode = $this->fakeSmsGateway()->lastCodeFor('+9647701239999');
-
+        // the code proves the phone, and only then does the account exist —
+        // and only the client holding the signup token can complete it
         $verifyRes = $this->postJson('/api/v1/app/auth/otp/verify', [
             'phone' => '07701239999',
-            'code' => $otpCode,
+            'code' => \App\Services\OtpService::FAKE_CODE,
+            'signup_token' => $registerRes->json('data.signup_token'),
         ]);
-        $verifyRes->assertStatus(200);
+        $verifyRes->assertStatus(201);
         $userToken = $verifyRes->json('data.token');
 
         // 7. User redeems Activation Code
@@ -150,37 +152,49 @@ class UserTrainingFlowTest extends TestCase
             ->assertJsonPath('data.curriculum.code', 'CURR-001')
             ->assertJsonCount(1, 'data.games');
 
-        // 9. User starts a Game Session
-        $startSessionRes = $this->withHeader('Authorization', 'Bearer '.$userToken)
-            ->postJson("/api/v1/app/games/{$game->id}/sessions", [
+        // 9. The child presses start — nothing is written, a sealed token comes back
+        $startRes = $this->withHeader('Authorization', 'Bearer '.$userToken)
+            ->postJson("/api/v1/app/games/{$game->id}/attempts", [
                 'curriculum_day_id' => $day->id,
             ]);
-        $startSessionRes->assertStatus(201)
-            ->assertJsonPath('data.status', 'STARTED');
+        $startRes->assertStatus(201)
+            ->assertJsonPath('data.curriculum_day_id', $day->id)
+            ->assertJsonPath('data.progress.status', 'NOT_STARTED');
 
-        $sessionId = $startSessionRes->json('data.id');
+        $attemptToken = $startRes->json('data.attempt_token');
 
-        // 10. User completes the Game Session
-        $completeSessionRes = $this->withHeader('Authorization', 'Bearer '.$userToken)
-            ->postJson("/api/v1/app/sessions/{$sessionId}/complete", [
-                'attempts' => 10,
-                'correct_attempts' => 9,
-                'incorrect_attempts' => 1,
-                'duration_seconds' => 45,
-                'score' => 95,
+        // The grade is attention measured on the server's clock, not the app's
+        // claim. Let the whole game elapse so the child genuinely earns a pass —
+        // start and complete in the same instant would score 0 and, with the
+        // pass gate on, correctly leave the day unfinished.
+        $this->travelTo(now()->addSeconds($game->duration_seconds));
+
+        // 10. The result comes back
+        $completeRes = $this->withHeader('Authorization', 'Bearer '.$userToken)
+            ->postJson("/api/v1/app/games/{$game->id}/attempts/complete", [
+                'attempt_token' => $attemptToken,
+                'duration_seconds' => $game->duration_seconds,
             ]);
-        $completeSessionRes->assertStatus(200)
-            ->assertJsonPath('data.status', 'COMPLETED')
-            ->assertJsonPath('data.accuracy', 90);
+        $completeRes->assertStatus(200)
+            ->assertJsonPath('data.attempt.effective_seconds', $game->duration_seconds)
+            ->assertJsonPath('data.attempt.score', 10)
+            ->assertJsonPath('data.attempt.is_passed', true)
+            ->assertJsonPath('data.game.status', 'PASSED');
 
         // 11. User checks overall Progress
         $progressRes = $this->withHeader('Authorization', 'Bearer '.$userToken)
             ->getJson('/api/v1/app/progress');
         $progressRes->assertStatus(200)
-            ->assertJsonPath('data.total_sessions', 1)
-            ->assertJsonPath('data.total_games_completed', 1)
-            ->assertJsonPath('data.average_accuracy', 90)
-            ->assertJsonPath('data.total_score', 95);
+            ->assertJsonPath('data.total_attempts', 1)
+            ->assertJsonPath('data.games_passed', 1)
+            ->assertJsonPath('data.grades.best_score', 10);
+
+        // …and this week's evaluation already shows the day
+        $this->withHeader('Authorization', 'Bearer '.$userToken)
+            ->getJson('/api/v1/app/progress/weekly')
+            ->assertStatus(200)
+            ->assertJsonPath('data.summary.games_passed', 1)
+            ->assertJsonPath('data.games.0.game.code', 'ATT-001');
 
         // 12. User checks Home API
         $homeRes = $this->withHeader('Authorization', 'Bearer '.$userToken)

@@ -14,7 +14,8 @@ const settingsForm = ref({
   app_name: '',
   is_maintenance: false,
   otp_enabled: true,
-  otp_expiry_minutes: 5,
+  otp_base_url: '',
+  profile_completion_enabled: false,
   otp_api_key: '', // always submitted blank; a new value here replaces the stored key
 })
 
@@ -40,7 +41,8 @@ const fetchSettingsData = async () => {
         app_name: res.data.app_name,
         is_maintenance: !!res.data.is_maintenance,
         otp_enabled: !!res.data.otp_enabled,
-        otp_expiry_minutes: res.data.otp_expiry_minutes || 5,
+        otp_base_url: res.data.otp_base_url || '',
+        profile_completion_enabled: !!res.data.profile_completion_enabled,
         otp_api_key: '',
       }
       isOtpApiKeyConfigured.value = !!res.data.otp_api_key_configured
@@ -71,7 +73,9 @@ const saveSettings = async () => {
     formData.append('app_name', settingsForm.value.app_name)
     formData.append('is_maintenance', settingsForm.value.is_maintenance ? '1' : '0')
     formData.append('otp_enabled', settingsForm.value.otp_enabled ? '1' : '0')
-    formData.append('otp_expiry_minutes', String(settingsForm.value.otp_expiry_minutes))
+    if (settingsForm.value.otp_base_url)
+      formData.append('otp_base_url', settingsForm.value.otp_base_url)
+    formData.append('profile_completion_enabled', settingsForm.value.profile_completion_enabled ? '1' : '0')
     if (settingsForm.value.otp_api_key)
       formData.append('otp_api_key', settingsForm.value.otp_api_key)
 
@@ -231,6 +235,27 @@ onMounted(() => {
                   <VDivider class="my-4" />
                 </VCol>
 
+                <!-- Second registration step -->
+                <VCol cols="12">
+                  <div class="d-flex align-center justify-space-between flex-wrap gap-4 bg-background pa-4 rounded mb-4">
+                    <div>
+                      <h4 class="font-weight-bold text-subtitle-1 mb-1 text-primary d-flex align-center gap-2">
+                        <VIcon icon="tabler-clipboard-list" />
+                        إكمال بيانات المشترك
+                      </h4>
+                      <p class="text-caption text-muted mb-0">
+                        عند التفعيل يُطلب من المشترك إكمال بياناته (المحافظة، الجنس، العمر، التسلسل في العائلة، نوع الولادة) عند فتح التطبيق، ولا يستطيع المتابعة قبل إكمالها.
+                        عند الإيقاف تختفي هذه الخطوة نهائياً من التطبيق ولا يظهر لها أي أثر.
+                      </p>
+                    </div>
+                    <VSwitch
+                      v-model="settingsForm.profile_completion_enabled"
+                      color="primary"
+                      inset
+                    />
+                  </div>
+                </VCol>
+
                 <!-- Maintenance Mode -->
                 <VCol cols="12">
                   <div class="d-flex align-center justify-space-between flex-wrap gap-4 bg-background pa-4 rounded">
@@ -269,7 +294,7 @@ onMounted(() => {
                     <div>
                       <h4 class="font-weight-bold text-subtitle-1 mb-1">تفعيل نظام التحقق بالـ OTP</h4>
                       <p class="text-caption text-muted mb-0">
-                        تمكين استخدام التحقق الثنائي وإرسال أكواد التحقق عند تسجيل المشتركين ودخولهم للتطبيق.
+                        إرسال رمز واتساب لإثبات رقم الهاتف عند التسجيل وعند استعادة كلمة المرور. الدخول لا يرسل أي رمز. عند الإيقاف يُنشأ الحساب مباشرة (بيئة تجريبية).
                       </p>
                     </div>
                     <VSwitch
@@ -282,24 +307,26 @@ onMounted(() => {
 
                 <!-- Configuration Fields (Visible only if enabled) -->
                 <template v-if="settingsForm.otp_enabled">
-                  <!-- Code Expiry -->
+                  <!-- Arqam base URL -->
                   <VCol cols="12" sm="6">
                     <VTextField
-                      v-model.number="settingsForm.otp_expiry_minutes"
-                      type="number"
-                      label="مدة صلاحية الرمز (بالدقائق)"
-                      placeholder="مثال: 5"
+                      v-model="settingsForm.otp_base_url"
+                      label="رابط خدمة أرقم (OTP)"
+                      placeholder="https://otp.arqam.tech/api"
+                      hint="من لوحة أرقم — لا تحذف /api من آخر الرابط. الرمز يُرسل عبر واتساب"
+                      persistent-hint
+                      dir="ltr"
                       class="mb-4"
                     />
                   </VCol>
 
-                  <!-- OTPIQ API Key -->
+                  <!-- Arqam API key -->
                   <VCol cols="12" sm="6">
                     <VTextField
                       v-model="settingsForm.otp_api_key"
                       :type="isOtpApiKeyVisible ? 'text' : 'password'"
-                      label="مفتاح OTPIQ API"
-                      :placeholder="isOtpApiKeyConfigured ? `مُهيّأ حالياً (${otpApiKeyPreview}) — اتركه فارغاً للإبقاء عليه` : 'أدخل مفتاح API من لوحة تحكم OTPIQ'"
+                      label="مفتاح أرقم (OTP)"
+                      :placeholder="isOtpApiKeyConfigured ? `مُهيّأ حالياً (${otpApiKeyPreview}) — اتركه فارغاً للإبقاء عليه` : 'يبدأ بـ otplive_ من لوحة أرقم'"
                       persistent-placeholder
                       hint="لن يظهر المفتاح الحالي لأسباب أمنية، أدخل قيمة جديدة فقط إن رغبت باستبداله"
                       persistent-hint
@@ -311,7 +338,7 @@ onMounted(() => {
 
                   <VCol cols="12" class="d-flex align-center flex-wrap gap-4">
                     <VAlert :type="isOtpApiKeyConfigured ? 'success' : 'warning'" variant="tonal" density="compact" class="flex-grow-1">
-                      {{ isOtpApiKeyConfigured ? 'يوجد مفتاح OTPIQ مُهيّأ وجاهز لإرسال رموز التحقق.' : 'لا يوجد مفتاح OTPIQ مُهيّأ بعد — لن يتم إرسال أي رموز تحقق حتى تُدخل مفتاحاً صالحاً.' }}
+                      {{ isOtpApiKeyConfigured ? 'يوجد مفتاح أرقم مُهيّأ وجاهز لإرسال رموز التحقق عبر واتساب.' : 'لا يوجد مفتاح أرقم مُهيّأ بعد — لن يتم إرسال أي رموز تحقق حتى تُدخل الرابط والمفتاح.' }}
                     </VAlert>
                     <VBtn
                       v-if="isOtpApiKeyConfigured"
@@ -357,7 +384,7 @@ onMounted(() => {
       <VCard class="pa-4">
         <VCardTitle class="d-flex align-center gap-2">
           <VIcon icon="tabler-send" />
-          اختبار إرسال رسالة OTPIQ
+          اختبار إرسال رمز عبر أرقم (واتساب)
         </VCardTitle>
         <VCardText>
           <p class="text-body-2 text-muted mb-4">

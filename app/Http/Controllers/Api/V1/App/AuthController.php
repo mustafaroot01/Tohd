@@ -8,7 +8,6 @@ use App\Actions\Auth\RegisterSubscriberAction;
 use App\Actions\Auth\ResendOtpAction;
 use App\Actions\Auth\ResetPasswordAction;
 use App\Actions\Auth\VerifyPhoneAction;
-use App\Enums\OtpPurpose;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\App\ForgotPasswordRequest;
 use App\Http\Requests\Api\V1\App\LoginRequest;
@@ -22,57 +21,54 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
+/**
+ * A WhatsApp code is sent in exactly two cases: to prove the phone once at
+ * signup, and before a password is replaced. Login is phone + password only.
+ *
+ *   register ──code──▶ otp/verify ──▶ account is created and signed in
+ *   login: phone + password ──▶ token          (no code)
+ *   password/forgot ──code──▶ password/reset ──▶ log in again
+ */
 class AuthController extends Controller
 {
+    /**
+     * Holds the signup and sends the code. No account exists until the code
+     * is proven — unless OTP is switched off, in which case the account is
+     * created and signed in right away.
+     */
     public function register(RegisterRequest $request, RegisterSubscriberAction $action): JsonResponse
     {
         $result = $action->execute($request->validated());
 
-        $data = ['user' => new SubscriberResource($result['user'])];
-        $message = 'تم إنشاء الحساب بنجاح، تم إرسال رمز التحقق إلى رقم هاتفك';
-
-        if ($result['token']) {
-            $data['token'] = $result['token'];
-            $data['token_type'] = 'Bearer';
-            $message = 'تم إنشاء الحساب وتفعيله بنجاح';
+        if (isset($result['user'])) {
+            return $this->authPayload($result, 'تم إنشاء الحساب وتفعيله بنجاح', Response::HTTP_CREATED);
         }
 
         return ApiResponse::success(
-            data: $data,
-            message: $message,
+            data: $result,
+            message: 'أرسلنا رمز التحقق إلى واتساب',
             status: Response::HTTP_CREATED
         );
     }
 
+    /** The code proved the phone: the account is created and signed in. */
     public function verifyOtp(VerifyOtpRequest $request, VerifyPhoneAction $action): JsonResponse
     {
         $result = $action->execute(
             phone: $request->validated('phone'),
-            code: $request->validated('code')
+            code: $request->validated('code'),
+            signupToken: $request->validated('signup_token')
         );
 
-        return ApiResponse::success(
-            data: [
-                'user' => new SubscriberResource($result['user']),
-                'token' => $result['token'],
-                'token_type' => 'Bearer',
-            ],
-            message: 'تم التحقق من رقم الهاتف وتفعيل الحساب بنجاح'
-        );
+        return $this->authPayload($result, 'تم إنشاء حسابك بنجاح', Response::HTTP_CREATED);
     }
 
+    /** "لم يصلني الرمز" — for both the signup and the recovery screens. */
     public function resendOtp(ResendOtpRequest $request, ResendOtpAction $action): JsonResponse
     {
-        $purpose = OtpPurpose::from($request->validated('purpose') ?? OtpPurpose::PHONE_VERIFICATION->value);
-
-        $action->execute(
-            phone: $request->validated('phone'),
-            purpose: $purpose
-        );
-
         return ApiResponse::success(
-            data: null,
-            message: 'تم إرسال رمز تحقق جديد إلى رقم هاتفك'
+            data: $action->execute($request->validated('phone')),
+            message: 'تم إرسال رمز جديد'
         );
     }
 
@@ -84,26 +80,14 @@ class AuthController extends Controller
             deviceName: $request->validated('device_name')
         );
 
-        return ApiResponse::success(
-            data: [
-                'user' => new SubscriberResource($result['user']),
-                'token' => $result['token'],
-                'token_type' => 'Bearer',
-            ],
-            message: 'تم تسجيل الدخول بنجاح'
-        );
+        return $this->authPayload($result, 'تم تسجيل الدخول بنجاح');
     }
 
     public function forgotPassword(ForgotPasswordRequest $request, ResendOtpAction $action): JsonResponse
     {
-        $action->execute(
-            phone: $request->validated('phone'),
-            purpose: OtpPurpose::PASSWORD_RESET
-        );
-
         return ApiResponse::success(
-            data: null,
-            message: 'تم إرسال رمز التحقق لاستعادة كلمة المرور إلى رقم هاتفك'
+            data: $action->sendReset($request->validated('phone')),
+            message: 'أرسلنا رمز استعادة كلمة المرور إلى واتساب'
         );
     }
 
@@ -117,7 +101,7 @@ class AuthController extends Controller
 
         return ApiResponse::success(
             data: null,
-            message: 'تم تحديث كلمة المرور بنجاح'
+            message: 'تم تغيير كلمة المرور، سجّل الدخول بكلمتك الجديدة'
         );
     }
 
@@ -128,6 +112,19 @@ class AuthController extends Controller
         return ApiResponse::success(
             data: null,
             message: 'تم تسجيل الخروج بنجاح'
+        );
+    }
+
+    private function authPayload(array $result, string $message, int $status = Response::HTTP_OK): JsonResponse
+    {
+        return ApiResponse::success(
+            data: [
+                'user' => new SubscriberResource($result['user']),
+                'token' => $result['token'],
+                'token_type' => 'Bearer',
+            ],
+            message: $message,
+            status: $status
         );
     }
 }

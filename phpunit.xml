@@ -23,6 +23,8 @@
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
+        <env name="OTP_FAKE" value="true"/>
+        <env name="SCORING_AUDIT_CHANNEL" value="null"/>
         <env name="DB_CONNECTION" value="mysql"/>
         <env name="DB_DATABASE" value="rihla_faris_testing"/>
         <env name="MAIL_MAILER" value="array"/>

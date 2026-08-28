@@ -180,7 +180,10 @@ const submitAdd = async () => {
               <AppSelect
                 v-model="form.status"
                 label="الحالة"
-                :items="statusOptions(SUBSCRIBER_STATUS)"
+                :items="[
+                  { title: 'فعال', value: 'ACTIVE' },
+                  { title: 'موقوف', value: 'SUSPENDED' },
+                ]"
               />
             </VCol>
           </VRow>

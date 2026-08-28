@@ -73,6 +73,21 @@ return [
             'replace_placeholders' => true,
         ],
 
+        /*
+         * One JSON line per graded attempt and per skip — the only per-attempt
+         * record the system keeps. Progress lives in the board and the daily
+         * table; this file exists for disputes and for specialists who want
+         * the exact sequence of a day. Rotate it, ship it, but don't query it.
+         */
+        'attempts' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/attempts.log'),
+            'level' => 'info',
+            'days' => env('LOG_ATTEMPTS_DAYS', 90),
+            'formatter' => Monolog\Formatter\JsonFormatter::class,
+            'replace_placeholders' => false,
+        ],
+
         'slack' => [
             'driver' => 'slack',
             'url' => env('LOG_SLACK_WEBHOOK_URL'),

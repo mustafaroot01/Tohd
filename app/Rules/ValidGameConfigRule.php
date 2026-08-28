@@ -25,10 +25,11 @@ class ValidGameConfigRule implements ValidationRule
             }
         }
 
+        // 0 is the agreed encoding for "unlimited attempts".
         if (isset($value['attempts'])) {
             $attempts = (int) $value['attempts'];
-            if ($attempts < 1 || $attempts > 100) {
-                $fail('عدد المحاولات (attempts) يجب أن يكون بين 1 و 100.');
+            if ($attempts !== 0 && ($attempts < 1 || $attempts > 100)) {
+                $fail('عدد المحاولات يجب أن يكون بين 1 و 100، أو 0 للمحاولات غير المحدودة.');
             }
         }
 

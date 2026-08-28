@@ -57,6 +57,10 @@ return [
             'prefix' => '',
             'prefix_indexes' => true,
             'strict' => true,
+            // Baghdad has had no DST since 2008, so a fixed offset is exact. Keeps
+            // TIMESTAMP columns and any CURRENT_TIMESTAMP default on the same
+            // clock as Carbon, whatever the host's system zone is.
+            'timezone' => env('DB_TIMEZONE', '+03:00'),
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),

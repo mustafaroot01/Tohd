@@ -2,168 +2,166 @@
 
 namespace App\Services;
 
-use App\Enums\GameSessionStatus;
 use App\Models\Axis;
-use App\Models\GameSession;
 use App\Models\Skill;
 use App\Models\Subscriber;
-use App\Models\UserSkillProgress;
-use Carbon\Carbon;
+use App\Models\SubscriberGameDaily;
+use App\Models\SubscriberGameProgress;
+use App\Support\WeekWindow;
 use Illuminate\Support\Collection;
 
+/**
+ * Progress reports for one child.
+ *
+ * Two sources and nothing else: the board (one row per game the child has
+ * touched) for "where do they stand", and the daily table for "how did the
+ * period go". Neither grows with how often the child plays.
+ */
 class ProgressCalculationService
 {
-    /**
-     * Calculate and return overall progress summary for a user.
-     */
+    public function __construct(protected ProgressBoardService $board) {}
+
     public function getOverallProgress(Subscriber $user): array
     {
-        $completedSessions = GameSession::where('subscriber_id', $user->id)
-            ->where('status', GameSessionStatus::COMPLETED)
-            ->with(['game.axis', 'game.skill'])
-            ->get();
-
-        $totalSessions = $completedSessions->count();
-        $totalDurationSeconds = (int) $completedSessions->sum('duration_seconds');
-        $uniqueGamesCompleted = $completedSessions->pluck('game_id')->unique()->count();
-        $averageAccuracy = $totalSessions > 0 ? round($completedSessions->avg('accuracy'), 1) : 0;
-        $totalScore = (int) $completedSessions->sum('score');
+        $rows = $this->boardRows($user);
 
         return [
-            'total_sessions' => $totalSessions,
-            'total_games_completed' => $uniqueGamesCompleted,
-            'total_duration_seconds' => $totalDurationSeconds,
-            'total_duration_minutes' => round($totalDurationSeconds / 60, 1),
-            'average_accuracy' => $averageAccuracy,
-            'total_score' => $totalScore,
-            'axes_progress' => $this->getAxisProgressBreakdown($user, $completedSessions),
-            'skills_progress' => $this->getSkillProgressBreakdown($user, $completedSessions),
+            'total_attempts' => (int) $rows->sum('total_attempts'),
+            'games_played' => $rows->count(),
+            'games_passed' => $rows->whereNotNull('passed_at')->count(),
+            // ever skipped, from the history — the board only remembers today's skip
+            'games_skipped' => SubscriberGameDaily::query()->where('subscriber_id', $user->id)->whereNotNull('skipped_at')->distinct()->count('game_id'),
+            'attention_seconds' => (int) $rows->sum('total_attention_seconds'),
+            'attention_minutes' => round(((int) $rows->sum('total_attention_seconds')) / 60, 1),
+            'grades' => $this->gradesFromBoard($rows),
+            'axes_progress' => $this->getAxisProgressBreakdown($user, $rows),
+            'skills_progress' => $this->getSkillProgressBreakdown($user, $rows),
         ];
     }
 
     /**
-     * Calculate skill-level breakdown and update the user_skill_progress cache table.
+     * The attention grade rolled up over board rows.
+     *
+     * Three numbers kept apart so the grade stays readable to a parent: the
+     * average (how they usually do), the best (what they can do), and the pass
+     * rate (how often they reach the bar).
+     *
+     * @param  Collection<int, SubscriberGameProgress>  $rows
+     * @return array{graded_attempts: int, short_attempts: int, average_score: float|null, best_score: int|null, passed_attempts: int, pass_rate: float|null, games_passed: int, attention_seconds: int}
      */
-    public function updateSkillProgressForUser(Subscriber $user, Skill $skill): UserSkillProgress
+    public function gradesFromBoard(Collection $rows): array
     {
-        $sessions = GameSession::where('subscriber_id', $user->id)
-            ->where('status', GameSessionStatus::COMPLETED)
-            ->whereHas('game', fn ($q) => $q->where('skill_id', $skill->id))
-            ->get();
+        $attempts = (int) $rows->sum('total_attempts');
+        $passed = (int) $rows->sum('total_passed');
 
-        $totalSessions = $sessions->count();
-        $uniqueGames = $sessions->pluck('game_id')->unique()->count();
-        $totalDuration = (int) $sessions->sum('duration_seconds');
-        $avgAccuracy = $totalSessions > 0 ? round($sessions->avg('accuracy'), 1) : 0;
-        $bestScore = (int) ($sessions->max('score') ?? 0);
-        $lastPlayedAt = $sessions->max('completed_at');
-
-        return UserSkillProgress::updateOrCreate(
-            ['subscriber_id' => $user->id, 'skill_id' => $skill->id],
-            [
-                'games_completed' => $uniqueGames,
-                'total_sessions' => $totalSessions,
-                'total_duration_seconds' => $totalDuration,
-                'average_accuracy' => $avgAccuracy,
-                'best_score' => $bestScore,
-                'last_played_at' => $lastPlayedAt,
-            ]
-        );
+        return [
+            'graded_attempts' => $attempts,
+            'short_attempts' => (int) $rows->sum('total_short'),
+            'average_score' => $attempts > 0 ? round($rows->sum('total_score_sum') / $attempts, 1) : null,
+            'best_score' => $attempts > 0 ? (int) $rows->max('best_score') : null,
+            'passed_attempts' => $passed,
+            'pass_rate' => $attempts > 0 ? round(($passed / $attempts) * 100, 1) : null,
+            'games_passed' => $rows->whereNotNull('passed_at')->count(),
+            'attention_seconds' => (int) $rows->sum('total_attention_seconds'),
+        ];
     }
 
-    /**
-     * Get axis-level progress breakdown.
-     */
-    public function getAxisProgressBreakdown(Subscriber $user, ?Collection $completedSessions = null): array
+    /** @param  Collection<int, SubscriberGameProgress>|null  $board */
+    public function getAxisProgressBreakdown(Subscriber $user, ?Collection $board = null): array
     {
-        if (! $completedSessions) {
-            $completedSessions = GameSession::where('subscriber_id', $user->id)
-                ->where('status', GameSessionStatus::COMPLETED)
-                ->with(['game.axis'])
-                ->get();
-        }
+        $board ??= $this->boardRows($user);
 
-        $axes = Axis::with('skills')->orderBy('sort_order')->get();
-
-        return $axes->map(function (Axis $axis) use ($completedSessions) {
-            $axisSessions = $completedSessions->filter(fn ($s) => $s->game?->axis_id === $axis->id);
-            $totalSessions = $axisSessions->count();
-            $avgAccuracy = $totalSessions > 0 ? round($axisSessions->avg('accuracy'), 1) : 0;
+        return Axis::orderBy('sort_order')->get()->map(function (Axis $axis) use ($board) {
+            $rows = $board->filter(fn ($r) => $r->game?->axis_id === $axis->id);
 
             return [
                 'axis_id' => $axis->id,
                 'name' => $axis->name,
                 'slug' => $axis->slug,
-                'total_sessions' => $totalSessions,
-                'average_accuracy' => $avgAccuracy,
-                'total_duration_seconds' => (int) $axisSessions->sum('duration_seconds'),
+                'games_played' => $rows->count(),
+                'grades' => $this->gradesFromBoard($rows),
             ];
         })->values()->toArray();
     }
 
-    /**
-     * Get skill-level progress breakdown.
-     */
-    public function getSkillProgressBreakdown(Subscriber $user, ?Collection $completedSessions = null): array
+    /** @param  Collection<int, SubscriberGameProgress>|null  $board */
+    public function getSkillProgressBreakdown(Subscriber $user, ?Collection $board = null): array
     {
-        if (! $completedSessions) {
-            $completedSessions = GameSession::where('subscriber_id', $user->id)
-                ->where('status', GameSessionStatus::COMPLETED)
-                ->with(['game.skill'])
-                ->get();
-        }
+        $board ??= $this->boardRows($user);
 
-        $skills = Skill::with('axis')->orderBy('sort_order')->get();
-
-        return $skills->map(function (Skill $skill) use ($completedSessions) {
-            $skillSessions = $completedSessions->filter(fn ($s) => $s->game?->skill_id === $skill->id);
-            $totalSessions = $skillSessions->count();
-            $avgAccuracy = $totalSessions > 0 ? round($skillSessions->avg('accuracy'), 1) : 0;
+        return Skill::with('axis')->orderBy('sort_order')->get()->map(function (Skill $skill) use ($board) {
+            $rows = $board->filter(fn ($r) => $r->game?->skill_id === $skill->id);
 
             return [
                 'skill_id' => $skill->id,
                 'name' => $skill->name,
                 'slug' => $skill->slug,
                 'axis_name' => $skill->axis?->name,
-                'total_sessions' => $totalSessions,
-                'average_accuracy' => $avgAccuracy,
-                'best_score' => (int) ($skillSessions->max('score') ?? 0),
-                'total_duration_seconds' => (int) $skillSessions->sum('duration_seconds'),
+                'games_played' => $rows->count(),
+                'grades' => $this->gradesFromBoard($rows),
             ];
         })->values()->toArray();
     }
 
     /**
-     * Get periodic progress summary (Daily / Weekly / Monthly).
+     * Today / this month, summed from the daily rows. The week has its own
+     * report (WeeklyReportService) because it is the unit of evaluation.
      */
     public function getPeriodicProgress(Subscriber $user, string $period = 'daily'): array
     {
-        $startDate = match ($period) {
-            'daily' => Carbon::now()->startOfDay(),
-            'weekly' => Carbon::now()->startOfWeek(),
-            'monthly' => Carbon::now()->startOfMonth(),
-            default => Carbon::now()->startOfDay(),
+        $now = now();
+
+        [$from, $to] = match ($period) {
+            'monthly' => [$now->copy()->startOfMonth()->toDateString(), $now->toDateString()],
+            'weekly' => [WeekWindow::containing($now)->start->toDateString(), $now->toDateString()],
+            default => [$now->toDateString(), $now->toDateString()],
         };
-
-        $sessions = GameSession::where('subscriber_id', $user->id)
-            ->where('status', GameSessionStatus::COMPLETED)
-            ->where('completed_at', '>=', $startDate)
-            ->with(['game.axis', 'game.skill'])
-            ->get();
-
-        $totalSessions = $sessions->count();
-        $totalDuration = (int) $sessions->sum('duration_seconds');
-        $avgAccuracy = $totalSessions > 0 ? round($sessions->avg('accuracy'), 1) : 0;
-        $totalScore = (int) $sessions->sum('score');
 
         return [
             'period' => $period,
-            'start_date' => $startDate->toDateString(),
-            'total_sessions' => $totalSessions,
-            'total_duration_seconds' => $totalDuration,
-            'total_duration_minutes' => round($totalDuration / 60, 1),
-            'average_accuracy' => $avgAccuracy,
-            'total_score' => $totalScore,
+            'start_date' => $from,
+            'end_date' => $to,
+            ...$this->summarize($this->board->dailyRows($user, $from, $to)),
         ];
+    }
+
+    /**
+     * One period of daily rows, added up.
+     *
+     * @param  Collection<int, SubscriberGameDaily>  $rows
+     * @return array{days_active: int, attempts: int, failed: int, short: int, games_played: int, games_passed: int, games_skipped: int, attention_seconds: int, best_score: int|null, average_best_score: float|null, average_score: float|null, pass_rate: float|null}
+     */
+    public function summarize(Collection $rows): array
+    {
+        $played = $rows->where('attempts', '>', 0);
+        $attempts = (int) $rows->sum('attempts');
+        $passedDays = $rows->whereNotNull('passed_at')->count();
+        $bestScores = $played->pluck('best_score')->filter(fn ($s) => $s !== null);
+
+        return [
+            'days_active' => $played->pluck('date')->map(fn ($d) => $d->toDateString())->unique()->count(),
+            'attempts' => $attempts,
+            'failed' => (int) $rows->sum('failed'),
+            'short' => (int) $rows->sum('short'),
+            'games_played' => $played->pluck('game_id')->unique()->count(),
+            'games_passed' => $rows->whereNotNull('passed_at')->pluck('game_id')->unique()->count(),
+            'games_skipped' => $rows->whereNotNull('skipped_at')->pluck('game_id')->unique()->count(),
+            'attention_seconds' => (int) $rows->sum('attention_seconds'),
+            'best_score' => $bestScores->isNotEmpty() ? (int) $bestScores->max() : null,
+            // the mean of each day's best, per game — the grade a specialist reads
+            'average_best_score' => $bestScores->isNotEmpty() ? round($bestScores->avg(), 1) : null,
+            // the mean over every attempt, including the poor ones
+            'average_score' => $attempts > 0 ? round($rows->sum('score_sum') / $attempts, 1) : null,
+            'pass_rate' => $played->count() > 0 ? round(($passedDays / $played->count()) * 100, 1) : null,
+        ];
+    }
+
+    /** @return Collection<int, SubscriberGameProgress> board rows with their game's axis/skill */
+    private function boardRows(Subscriber $user): Collection
+    {
+        return SubscriberGameProgress::query()
+            ->where('subscriber_id', $user->id)
+            ->with('game:id,axis_id,skill_id')
+            ->get();
     }
 }

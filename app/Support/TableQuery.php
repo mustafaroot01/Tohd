@@ -82,8 +82,18 @@ class TableQuery
                 $param = $column;
             }
 
-            if ($request->filled($param)) {
-                $query->where($column, $request->input($param));
+            if (! $request->filled($param)) {
+                continue;
+            }
+
+            $value = $request->input($param);
+            // a list (type[]=A&type[]=B, or type=A,B) narrows to any of them
+            $values = is_array($value) ? $value : (str_contains((string) $value, ',') ? explode(',', (string) $value) : null);
+
+            if ($values !== null) {
+                $query->whereIn($column, array_values(array_filter(array_map('trim', $values), fn ($v) => $v !== '')));
+            } else {
+                $query->where($column, $value);
             }
         }
 

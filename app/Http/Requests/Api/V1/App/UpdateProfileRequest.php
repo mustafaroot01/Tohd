@@ -2,15 +2,16 @@
 
 namespace App\Http\Requests\Api\V1\App;
 
-use App\Http\Requests\Concerns\NormalizesPhone;
-use App\Rules\PhoneNumberRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
+/**
+ * The phone number is the account's identity and is proven once at signup, so
+ * it cannot be edited from the app — a self-service change would let anyone
+ * park their account on someone else's number. An admin changes it from the
+ * dashboard when a parent really has a new number.
+ */
 class UpdateProfileRequest extends FormRequest
 {
-    use NormalizesPhone;
-
     public function authorize(): bool
     {
         return true;
@@ -18,16 +19,22 @@ class UpdateProfileRequest extends FormRequest
 
     public function rules(): array
     {
-        $subscriberId = $this->user()?->id;
-
         return [
             'name' => ['sometimes', 'required', 'string', 'max:255'],
-            'phone' => ['sometimes', 'required', 'string', new PhoneNumberRule, Rule::unique('subscribers', 'phone')->ignore($subscriberId)],
             'address' => ['sometimes', 'nullable', 'string', 'max:500'],
             // changing the password requires proving you know the current one,
             // otherwise a leaked token is a permanent account takeover
             'current_password' => ['required_with:password', 'string'],
-            'password' => ['nullable', 'string', 'min:8', 'confirmed'],
+            'password' => ['nullable', 'string', 'min:8', 'max:64', 'confirmed'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'name.required' => 'الاسم مطلوب',
+            'password.min' => 'كلمة المرور يجب أن تكون 8 أحرف على الأقل',
+            'password.confirmed' => 'تأكيد كلمة المرور غير مطابق',
         ];
     }
 }

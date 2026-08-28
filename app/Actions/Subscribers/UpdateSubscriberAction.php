@@ -2,10 +2,7 @@
 
 namespace App\Actions\Subscribers;
 
-use App\Actions\Otp\SendOtpAction;
-use App\Enums\OtpPurpose;
 use App\Enums\SubscriberActivityType;
-use App\Enums\SubscriberStatus;
 use App\Models\Subscriber;
 use App\Models\User;
 use App\Services\AuditLogService;
@@ -17,9 +14,13 @@ class UpdateSubscriberAction
     public function __construct(
         protected AuditLogService $auditLog,
         protected SubscriberActivityLogger $activityLogger,
-        protected SendOtpAction $sendOtp
     ) {}
 
+    /**
+     * An admin edit is trusted: a phone set from the dashboard is taken as
+     * verified, no code is sent. The change is logged on both the admin audit
+     * trail and the subscriber's own timeline.
+     */
     public function execute(Subscriber $subscriber, array $data, ?User $admin = null): Subscriber
     {
         $oldValues = $subscriber->only(['name', 'phone', 'address', 'status']);
@@ -33,10 +34,7 @@ class UpdateSubscriberAction
         }
 
         if ($phoneChanged) {
-            // Changing the phone always forces re-verification, regardless of any
-            // status value submitted in the same request.
-            $updates['phone_verified_at'] = null;
-            $updates['status'] = SubscriberStatus::UNVERIFIED;
+            $updates['phone_verified_at'] = now();
         }
 
         $subscriber->update($updates);
@@ -44,8 +42,7 @@ class UpdateSubscriberAction
         $this->auditLog->log('SUBSCRIBER_UPDATED', 'Subscriber', $subscriber->id, $oldValues, $subscriber->only(['name', 'phone', 'address', 'status']), $admin);
 
         if ($phoneChanged) {
-            $this->activityLogger->log($subscriber, SubscriberActivityType::PHONE_CHANGED, ['new_phone' => $subscriber->phone]);
-            $this->sendOtp->execute($subscriber, $subscriber->phone, OtpPurpose::PHONE_VERIFICATION);
+            $this->activityLogger->log($subscriber, SubscriberActivityType::PHONE_CHANGED, ['new_phone' => $subscriber->phone, 'by_admin' => true]);
         }
 
         return $subscriber->fresh();

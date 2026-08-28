@@ -49,6 +49,10 @@ return new class extends Migration
     public function down(): void
     {
         foreach ($this->indexes as $table => $columns) {
+            if (! Schema::hasTable($table)) {
+                continue; // dropped by a later migration
+            }
+
             Schema::table($table, function (Blueprint $blueprint) use ($table, $columns): void {
                 foreach ($columns as $column) {
                     $blueprint->dropIndex("{$table}_{$column}_index");

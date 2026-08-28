@@ -15,8 +15,10 @@ declare global {
   const CreateUrl: typeof import('./src/@core/composable/CreateUrl')['CreateUrl']
   const EffectScope: typeof import('vue')['EffectScope']
   const GAME_DIFFICULTY: typeof import('./resources/ts/utils/statuses')['GAME_DIFFICULTY']
+  const GAME_PROGRESS_STATUS: typeof import('./resources/ts/utils/statuses')['GAME_PROGRESS_STATUS']
   const GAME_STATUS: typeof import('./resources/ts/utils/statuses')['GAME_STATUS']
   const PRODUCT_STATUS: typeof import('./resources/ts/utils/statuses')['PRODUCT_STATUS']
+  const SESSION_STATUS: typeof import('./resources/ts/utils/statuses')['SESSION_STATUS']
   const SUBSCRIBER_STATUS: typeof import('./resources/ts/utils/statuses')['SUBSCRIBER_STATUS']
   const USER_STATUS: typeof import('./resources/ts/utils/statuses')['USER_STATUS']
   const acceptHMRUpdate: typeof import('pinia')['acceptHMRUpdate']
@@ -140,6 +142,7 @@ declare global {
   const registerPlugins: typeof import('./resources/ts/@core/utils/plugins')['registerPlugins']
   const registerPlugins_: typeof import('./src/@core/utils/plugins')['registerPlugins_']
   const requiredValidator: typeof import('./resources/ts/@core/utils/validators')['requiredValidator']
+  const resolveAssetUrl: typeof import('./resources/ts/utils/assetUrl')['resolveAssetUrl']
   const resolveComponent: typeof import('vue')['resolveComponent']
   const resolveRef: typeof import('@vueuse/core')['resolveRef']
   const resolveUnref: typeof import('@vueuse/core')['resolveUnref']
@@ -400,6 +403,7 @@ declare module 'vue' {
     readonly CURRICULUM_STATUS: UnwrapRef<typeof import('./resources/ts/utils/statuses')['CURRICULUM_STATUS']>
     readonly EffectScope: UnwrapRef<typeof import('vue')['EffectScope']>
     readonly GAME_DIFFICULTY: UnwrapRef<typeof import('./resources/ts/utils/statuses')['GAME_DIFFICULTY']>
+    readonly GAME_PROGRESS_STATUS: UnwrapRef<typeof import('./resources/ts/utils/statuses')['GAME_PROGRESS_STATUS']>
     readonly GAME_STATUS: UnwrapRef<typeof import('./resources/ts/utils/statuses')['GAME_STATUS']>
     readonly PRODUCT_STATUS: UnwrapRef<typeof import('./resources/ts/utils/statuses')['PRODUCT_STATUS']>
     readonly SUBSCRIBER_STATUS: UnwrapRef<typeof import('./resources/ts/utils/statuses')['SUBSCRIBER_STATUS']>
@@ -522,6 +526,7 @@ declare module 'vue' {
     readonly regexValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['regexValidator']>
     readonly registerPlugins: UnwrapRef<typeof import('./resources/ts/@core/utils/plugins')['registerPlugins']>
     readonly requiredValidator: UnwrapRef<typeof import('./resources/ts/@core/utils/validators')['requiredValidator']>
+    readonly resolveAssetUrl: UnwrapRef<typeof import('./resources/ts/utils/assetUrl')['resolveAssetUrl']>
     readonly resolveComponent: UnwrapRef<typeof import('vue')['resolveComponent']>
     readonly resolveRef: UnwrapRef<typeof import('@vueuse/core')['resolveRef']>
     readonly resolveUnref: UnwrapRef<typeof import('@vueuse/core')['resolveUnref']>

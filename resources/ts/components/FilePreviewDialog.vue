@@ -26,24 +26,9 @@ const close = () => {
 const lottieJson = ref<string>('')
 const isLoadingLottie = ref(false)
 
-const getAbsoluteUrl = (url: string) => {
-  if (!url) return ''
-  if (url.startsWith('http://') || url.startsWith('https://')) return url
-
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || ''
-  if (apiBaseUrl && (apiBaseUrl.startsWith('http://') || apiBaseUrl.startsWith('https://'))) {
-    try {
-      const parsed = new URL(apiBaseUrl)
-      return `${parsed.origin}${url.startsWith('/') ? '' : '/'}${url}`
-    } catch (e) {
-      console.error(e)
-    }
-  }
-
-  // The app is served by Laravel, so same-origin is always right. The old code
-  // hard-coded port 8000, which broke the moment the server ran on any other port.
-  return `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`
-}
+// URL resolution lives in resources/ts/utils/assetUrl.ts — one copy, shared
+// with the game preview.
+const getAbsoluteUrl = (url: string) => resolveAssetUrl(url)
 
 watch(() => props.modelValue, async (isOpen) => {
   if (isOpen && props.fileType === 'LOTTIE' && props.fileUrl) {

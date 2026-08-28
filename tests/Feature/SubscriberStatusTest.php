@@ -79,7 +79,7 @@ class SubscriberStatusTest extends TestCase
         $response->assertStatus(403)->assertJsonPath('error_code', 'ACCOUNT_SUSPENDED');
     }
 
-    public function test_admin_updating_subscriber_phone_forces_reverification(): void
+    public function test_admin_updating_subscriber_phone_is_trusted_and_verified(): void
     {
         $subscriber = Subscriber::create([
             'name' => 'Faris',
@@ -98,9 +98,10 @@ class SubscriberStatusTest extends TestCase
             ]);
 
         $updateRes->assertStatus(200)
-            ->assertJsonPath('data.status', 'UNVERIFIED')
+            ->assertJsonPath('data.status', 'ACTIVE')
             ->assertJsonPath('data.phone', '+9647701230099');
 
-        $this->assertNotNull($this->fakeSmsGateway()->lastCodeFor('+9647701230099'));
+        $this->assertNotNull($subscriber->fresh()->phone_verified_at);
+        $this->assertDatabaseMissing('phone_verifications', ['phone' => '+9647701230099']);
     }
 }

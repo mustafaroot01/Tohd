@@ -64,6 +64,11 @@ export default [
     icon: { icon: 'tabler-users' },
   },
   {
+    title: 'المحافظات',
+    to: 'governorates',
+    icon: { icon: 'tabler-map-pin' },
+  },
+  {
     heading: 'إعدادات النظام والتهيئة',
   },
   {

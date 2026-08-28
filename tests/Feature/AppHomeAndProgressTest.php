@@ -28,7 +28,7 @@ class AppHomeAndProgressTest extends TestCase
         $homeRes->assertStatus(200)
             ->assertJsonPath('success', true)
             ->assertJsonStructure([
-                'data' => ['user', 'activation', 'assignment', 'today', 'progress', 'continue_session'],
+                'data' => ['user', 'activation', 'assignment', 'today', 'progress'],
             ]);
 
         // 2. Progress API
@@ -36,8 +36,9 @@ class AppHomeAndProgressTest extends TestCase
             ->getJson('/api/v1/app/progress');
 
         $progRes->assertStatus(200)
-            ->assertJsonPath('data.total_sessions', 0)
-            ->assertJsonPath('data.average_accuracy', 0);
+            ->assertJsonPath('data.total_attempts', 0)
+            ->assertJsonPath('data.games_passed', 0)
+            ->assertJsonPath('data.grades.average_score', null);
 
         // 3. Periodic Progress APIs (daily / weekly / monthly)
         $dailyRes = $this->withHeader('Authorization', 'Bearer '.$token)

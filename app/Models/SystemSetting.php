@@ -10,6 +10,7 @@ class SystemSetting extends Model
     protected $table = 'system_settings';
 
     public $incrementing = false;
+
     protected $keyType = 'string';
 
     protected $fillable = [
@@ -18,8 +19,9 @@ class SystemSetting extends Model
         'app_logo',
         'is_maintenance',
         'otp_enabled',
+        'otp_base_url',
         'otp_api_key',
-        'otp_expiry_minutes',
+        'profile_completion_enabled',
     ];
 
     protected $hidden = [
@@ -29,7 +31,7 @@ class SystemSetting extends Model
     protected $casts = [
         'is_maintenance' => 'boolean',
         'otp_enabled' => 'boolean',
-        'otp_expiry_minutes' => 'integer',
+        'profile_completion_enabled' => 'boolean',
     ];
 
     protected $appends = [
@@ -51,12 +53,12 @@ class SystemSetting extends Model
     }
 
     /**
-     * Whether an OTPIQ API key is currently set (DB or .env fallback) —
-     * exposed instead of the raw key, which is never returned to the client.
+     * Whether an Arqam API key is currently set — exposed instead of the raw
+     * key, which is never returned to the client.
      */
     public function getOtpApiKeyConfiguredAttribute(): bool
     {
-        return filled($this->attributes['otp_api_key'] ?? null) || filled(config('otp.otpiq.api_key'));
+        return filled($this->attributes['otp_api_key'] ?? null);
     }
 
     /**
@@ -64,33 +66,55 @@ class SystemSetting extends Model
      */
     public function getOtpApiKeyPreviewAttribute(): ?string
     {
-        $key = $this->attributes['otp_api_key'] ?? config('otp.otpiq.api_key');
+        $key = $this->attributes['otp_api_key'] ?? null;
 
         return $key ? '••••'.substr($key, -4) : null;
     }
 
-    /**
-     * Resolve the OTPIQ API key actually used for sending — DB override first,
-     * falling back to config('otp.otpiq.api_key') from .env.
-     */
+    /** The Arqam API key used for sending. */
     public function resolvedOtpApiKey(): ?string
     {
-        return $this->attributes['otp_api_key'] ?? config('otp.otpiq.api_key');
+        return $this->attributes['otp_api_key'] ?? null;
     }
 
     /**
      * Get the singleton instance of SystemSetting.
      */
+    /** Container-scoped so the seven callers in one request cost one read. */
+    private const CACHE_KEY = 'system.settings';
+
     public static function get(): self
     {
-        return self::firstOrCreate(
+        if (app()->bound(self::CACHE_KEY)) {
+            return app(self::CACHE_KEY);
+        }
+
+        // refresh() only on creation: firstOrCreate hands back just the
+        // attributes it was given, so a new row would miss every nullable column
+        $settings = self::firstOrCreate(
             ['id' => 'default'],
             [
                 'app_name' => 'رحلة فارس',
                 'is_maintenance' => false,
                 'otp_enabled' => true,
-                'otp_expiry_minutes' => 5,
+                // Arqam's documented endpoint; the key is entered from the dashboard
+                'otp_base_url' => 'https://otp.arqam.tech/api',
+                'profile_completion_enabled' => false,
             ]
         );
+
+        if ($settings->wasRecentlyCreated) {
+            $settings->refresh();
+        }
+
+        app()->instance(self::CACHE_KEY, $settings);
+
+        return $settings;
+    }
+
+    /** Call after writing settings so the next read sees them. */
+    public static function forgetCached(): void
+    {
+        app()->forgetInstance(self::CACHE_KEY);
     }
 }

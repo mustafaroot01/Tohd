@@ -21,7 +21,9 @@ class StoreGameRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'slug' => ['nullable', 'string', 'max:255', 'unique:games,slug'],
             'description' => ['nullable', 'string'],
-            'type' => ['required', new Enum(GameType::class)],
+            // The dashboard no longer asks for an interaction type; CreateGameAction
+            // falls back to GameType::TAP when it is absent.
+            'type' => ['nullable', new Enum(GameType::class)],
             'axis_id' => ['required', 'uuid', 'exists:axes,id'],
             'skill_id' => ['required', 'uuid', 'exists:skills,id'],
             'level_id' => ['required', 'uuid', 'exists:levels,id'],

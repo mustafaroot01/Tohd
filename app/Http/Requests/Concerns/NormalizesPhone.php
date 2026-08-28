@@ -15,9 +15,13 @@ trait NormalizesPhone
 {
     protected function prepareForValidation(): void
     {
-        if ($this->filled('phone')) {
+        $phone = $this->input('phone');
+
+        // whatever the caller sent — an array, an object — must reach the
+        // validator untouched instead of crashing the normaliser
+        if (is_string($phone) || is_int($phone) || is_float($phone)) {
             $this->merge([
-                'phone' => PhoneNumber::normalize($this->input('phone')) ?? $this->input('phone'),
+                'phone' => PhoneNumber::normalize((string) $phone) ?? $phone,
             ]);
         }
     }

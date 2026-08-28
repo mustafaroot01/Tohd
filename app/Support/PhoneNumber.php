@@ -11,7 +11,7 @@ class PhoneNumber
      */
     public static function normalize(string $raw): ?string
     {
-        $countryCode = config('otp.default_country_code', '964');
+        $countryCode = config('services.otp.country_code', '964');
         $digits = preg_replace('/\D/', '', $raw);
 
         if ($digits === null || $digits === '') {

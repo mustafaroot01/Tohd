@@ -2,7 +2,7 @@
 
 namespace App\Http\Resources\Api\V1\Admin;
 
-use App\Http\Resources\Api\V1\GameSessionResource;
+use App\Http\Resources\Api\V1\SubscriberProfileResource;
 use App\Models\UserCurriculumAssignment;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -13,7 +13,7 @@ class SubscriberDetailResource extends JsonResource
     {
         $subscriber = $this->resource['subscriber'];
         $current = $subscriber->activeCurriculumAssignment;
-        $sessions = $subscriber->gameSessions ?? collect();
+        $progress = $this->resource['progress'];
 
         return [
             'id' => $subscriber->id,
@@ -60,13 +60,24 @@ class SubscriberDetailResource extends JsonResource
                     'code' => $curriculum->code,
                 ])->values(),
 
-            'sessions' => GameSessionResource::collection($sessions->take(50)),
-            'sessions_summary' => [
-                'total' => $sessions->count(),
-                'completed' => $sessions->where('status', 'COMPLETED')->count(),
+            // all-time, from the board: bounded by games, not by play
+            'play_summary' => [
+                'attempts' => $progress['total_attempts'],
+                'short_attempts' => $progress['grades']['short_attempts'],
+                'games_played' => $progress['games_played'],
+                'games_passed' => $progress['games_passed'],
+                'skipped_games' => $progress['games_skipped'],
             ],
 
-            'progress' => $this->resource['progress'],
+            // the supplementary details, when they were ever filled in
+            'details' => $subscriber->profile
+                ? (new SubscriberProfileResource($subscriber->profile))->resolve()
+                : null,
+
+            'progress' => $progress,
+
+            // the current week, game by game; other weeks via /weekly?week=
+            'weekly' => $this->resource['weekly'],
 
             'activity_timeline' => $subscriber->activities->map(fn ($activity) => [
                 'type' => $activity->type?->value,

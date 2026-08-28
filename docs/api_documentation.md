@@ -40,35 +40,9 @@ http://127.0.0.1:8000/api/v1
 
 ## 2. المصادقة والتحقق (Authentication: `/api/v1/auth`)
 
-### 1. تسجيل مستخدم جديد (Register)
-- **المسار**: `POST /api/v1/auth/register`
-- **الجسم (Body)**:
-```json
-{
-    "name": "فارس البطل",
-    "email": "faris@example.com",
-    "password": "password123"
-}
-```
-- **الاستجابة (201 Created)**:
-```json
-{
-    "success": true,
-    "message": "تم تسجيل الحساب بنجاح",
-    "data": {
-        "user": {
-            "id": "9d8b3c2e-...",
-            "name": "فارس البطل",
-            "email": "faris@example.com",
-            "role": "USER"
-        },
-        "token": "1|sanctum_plain_text_token...",
-        "token_type": "Bearer"
-    }
-}
-```
+> لا يوجد تسجيل ذاتي لحسابات لوحة التحكم؛ يُنشئها مدير النظام. تسجيل المشتركين (أهل الأطفال) في القسم 3 — البند 0.
 
-### 2. تسجيل الدخول (Login)
+### 1. تسجيل الدخول (Login)
 - **المسار**: `POST /api/v1/auth/login`
 - **الجسم (Body)**:
 ```json
@@ -95,10 +69,10 @@ http://127.0.0.1:8000/api/v1
 }
 ```
 
-### 3. الملف الشخصي الحالي (Current User)
+### 2. الملف الشخصي الحالي (Current User)
 - **المسار**: `GET /api/v1/auth/me` (Auth: Sanctum)
 
-### 4. تسجيل الخروج (Logout)
+### 3. تسجيل الخروج (Logout)
 - **المسار**: `POST /api/v1/auth/logout` (Auth: Sanctum)
 
 ---
@@ -106,6 +80,90 @@ http://127.0.0.1:8000/api/v1
 ## 3. تطبيق المستخدم (Mobile App: `/api/v1/app`)
 
 المسارات تتطلب توكن مستخدم بحساب `USER`:
+
+### 0. الحساب — التسجيل بواتساب OTP، الدخول، استعادة كلمة المرور (`/api/v1/app/auth`)
+
+رمز واتساب يُرسَل في **حالتين فقط**: لإثبات الرقم مرة واحدة عند **التسجيل**، ولإثباته قبل **تغيير كلمة المرور**. **تسجيل الدخول لا يُرسل أي رمز** — رقم + كلمة مرور ← توكن.
+
+> **الحساب لا يُنشأ إلا بعد نجاح الرمز.** التسجيل يحفظ البيانات مؤقتاً (١٠ دقائق) ويرسل الرمز؛ لحظة إدخال الرمز الصحيح **يُولَد الحساب مفعّلاً ويدخل التطبيق فوراً بتوكن**. لا توجد حالة «بانتظار التوثيق».
+
+```
+إنشاء حساب:   POST register ──رمز واتساب──▶ POST otp/verify ──▶ حساب + توكن (يدخل مباشرة)
+كل دخول:      POST login (رقم + كلمة مرور) ──▶ توكن
+نسيت كلمتي:   POST password/forgot ──رمز──▶ POST password/reset ──▶ سجّل الدخول بالجديدة
+```
+
+رقم الهاتف يُقبل بصيغ `07701234567` · `+9647701234567` · `9647701234567` ويُخزَّن ويُرجَع دائماً `+9647701234567`. الرمز **٦ أرقام**. في بيئة التطوير (`OTP_FAKE=true`) لا يُرسل شيء والرمز `123456`.
+
+#### `POST /api/v1/app/auth/register` — يحفظ البيانات ويرسل الرمز (لا حساب بعد)
+```json
+{ "name": "فارس الصغير", "phone": "07701234567", "password": "secret123456", "password_confirmation": "secret123456", "address": "بغداد" }
+```
+`201`:
+```json
+{ "success": true, "message": "أرسلنا رمز التحقق إلى واتساب",
+  "data": { "phone": "+9647701234567", "signup_token": "aZ8…", "resend_in": 60 } }
+```
+`422` رقم له حساب: `errors.phone[0] = "رقم الهاتف مسجّل بالفعل، سجّل الدخول أو استعد كلمة المرور"` · `422` حقول: `errors.{name|phone|password}` · `422` قبل مرور ٦٠ ثانية على آخر رمز: `error_code = OTP_COOLDOWN` و`errors.otp = ["COOLDOWN"]` (استخدم `resend_in` من الرد السابق كعدّاد بدل إعادة المحاولة) · `503` خدمة الرسائل متعطّلة: `error_code = OTP_SERVICE_UNAVAILABLE` (اعرض `message` كـ«حاول لاحقاً»).
+
+> ابدأ عدّاداً تنازلياً بـ`resend_in` ثانية قبل إظهار زر «إعادة الإرسال».
+
+#### `POST /api/v1/app/auth/otp/verify` — يُنشئ الحساب ويدخل
+```json
+{ "phone": "07701234567", "code": "123456", "signup_token": "aZ8…" }
+```
+> **`signup_token` مطلوب**: احفظه من رد `register` وأرسله هنا. هو ما يمنع شخصاً سجّل برقمك من إكمال الحساب بكلمة سرّه لمن تُدخل أنت الرمز الواصل لهاتفك. إن لم يطابق فالرد `422` «انتهت جلسة التسجيل» — أعد التسجيل.
+`201`:
+```json
+{ "success": true, "message": "تم إنشاء حسابك بنجاح", "data": { "user": { "id": "…", "name": "فارس الصغير", "phone": "+9647701234567", "status": "ACTIVE" }, "token": "12|…", "token_type": "Bearer" } }
+```
+`422` رمز خاطئ: `error_code = OTP_INVALID_CODE`, `errors.otp = ["INVALID_CODE"]` · `422` منتهٍ: `errors.otp = ["EXPIRED_CODE"]` (فعّل «إعادة الإرسال») · `422` انتهت جلسة التسجيل (١٠ دقائق): `errors.phone[0] = "انتهت جلسة التسجيل، أعد إدخال بياناتك"` (أعِده لشاشة التسجيل) · `429` محاولات كثيرة.
+
+#### `POST /api/v1/app/auth/otp/resend` — «لم يصلني الرمز» (لشاشتَي التسجيل والاستعادة)
+`{ "phone": "07701234567" }` → `200 { "data": { "phone", "purpose": "register" | "reset", "resend_in": 60 } }` · `422 errors.otp = ["COOLDOWN"]` قبل مرور ٦٠ ثانية · `422 errors.phone` لرقم بلا حساب ولا تسجيل جارٍ.
+
+#### `POST /api/v1/app/auth/login` — بلا رمز
+`{ "phone": "07701234567", "password": "secret123456", "device_name": "iphone" }` → `200 { "data": { "user", "token", "token_type" } }` · `401 INVALID_CREDENTIALS` · `403 ACCOUNT_SUSPENDED`.
+
+#### `POST /api/v1/app/auth/password/forgot` → `POST /api/v1/app/auth/password/reset`
+`forgot`: `{ "phone" }` → `200 { "data": { "phone", "resend_in" } }` (`403 ACCOUNT_SUSPENDED` · `422 errors.phone` لرقم بلا حساب · `422 OTP_COOLDOWN` قبل مرور ٦٠ ثانية). حدود الاستعادة منفصلة عن حدود التسجيل، فلا يستطيع أحد استهلاك رصيدك.
+`reset`: `{ "phone", "code", "password", "password_confirmation" }` → `200` — **كل الجلسات القديمة تنتهي**، سجّل الدخول بالكلمة الجديدة.
+
+#### الملف الشخصي 🔒
+`PUT /api/v1/app/profile` يقبل `name` و`address` و`password` (مع `current_password` و`password_confirmation`). **رقم الهاتف غير قابل للتعديل من التطبيق** — هو هوية الحساب وأُثبت مرة عند التسجيل؛ يغيّره المشرف من لوحة التحكم عند الحاجة.
+
+**الحدود:** إرسال الرموز ٤ مرات لكل رقم كل ١٠ دقائق (`register`, `otp/resend`, `password/forgot`)، والتحقق ٨ محاولات لكل رقم كل ١٠ دقائق (`otp/verify`, `password/reset`) — يرجع `429 TOO_MANY_REQUESTS`. الحدود **على رقم الهاتف فقط** ولا تعتمد على عنوان الجهاز، لأن عوائل كثيرة في العراق تشترك بعنوان واحد. وحدود الاستعادة منفصلة عن حدود التسجيل.
+
+### 0-ب. إكمال بيانات المشترك (خطوة ثانية اختيارية) 🔒
+
+خطوة تُشغَّل وتُطفأ من لوحة التحكم (**إعدادات النظام ← إكمال بيانات المشترك**).
+
+> **وهي مطفأة، الميزة غير موجودة من ناحية الـAPI**: لا يظهر لها أي مفتاح في أي رد، ومساراها يرجعان `404`. وهي مشتغلة تصير **إلزامية**: كل مسارات التدريب والاشتراك ترجع `403 PROFILE_INCOMPLETE` حتى تُكمَل.
+
+`GET /app/home` و`GET /app/profile` يحملان — **فقط عند التشغيل**:
+```json
+"profile_completion": { "is_complete": false,
+  "missing_fields": ["governorate_id","gender","age","family_order","delivery_type"] }
+```
+فيعرض التطبيق شاشة «أكمل بياناتك» أول ما يفتح، ويمنع المتابعة قبلها.
+
+#### `GET /api/v1/app/governorates` 🔒
+المحافظات الظاهرة مرتّبة: `[{ "id": "…", "name": "بغداد" }, …]` (18 محافظة افتراضياً، يديرها المشرف).
+
+#### `POST /api/v1/app/profile/details` 🔒
+```json
+{ "governorate_id": "…", "gender": "MALE", "age": 6, "family_order": 2, "delivery_type": "CESAREAN" }
+```
+
+| الحقل | القيد |
+|---|---|
+| `governorate_id` | مطلوب · من `GET /app/governorates` (المخفية تُرفض) |
+| `gender` | مطلوب · `MALE` أو `FEMALE` |
+| `age` | مطلوب · عدد صحيح من 1 إلى 18 |
+| `family_order` | مطلوب · عدد صحيح من 1 إلى 20 |
+| `delivery_type` | مطلوب · `NATURAL` أو `CESAREAN` |
+
+`200` يرجع الملف الشخصي كاملاً ومعه `details` و`profile_completion.is_complete = true`، فيتابع المستخدم مباشرة. الإرسال مرة ثانية **يعدّل** البيانات ولا ينشئ صفاً جديداً. `422` توزَّع أخطاؤه على الحقول.
 
 ### 1. الصفحة الرئيسية (App Home)
 - **المسار**: `GET /api/v1/app/home`
@@ -130,11 +188,15 @@ http://127.0.0.1:8000/api/v1
             ]
         },
         "progress": {
-            "total_sessions": 5,
-            "total_games_completed": 3,
-            "average_accuracy": 88.5
-        },
-        "continue_session": null
+            "total_attempts": 5,
+            "games_played": 3,
+            "games_passed": 2,
+            "games_skipped": 0,
+            "attention_seconds": 240,
+            "attention_minutes": 4.0,
+            "grades": { "graded_attempts": 5, "short_attempts": 1, "average_score": 7.2, "best_score": 10, "passed_attempts": 3, "pass_rate": 60.0, "games_passed": 2, "attention_seconds": 240 },
+            "axes_progress": [], "skills_progress": []
+        }
     }
 }
 ```
@@ -166,57 +228,64 @@ http://127.0.0.1:8000/api/v1
 ### 4. تفاصيل لعبة قابلة للعب (Playable Game Details)
 - **المسار**: `GET /api/v1/app/games/{game_id}`
 
-### 5. بدء جلسة لعب (Start Game Session)
-- **المسار**: `POST /api/v1/app/games/{game_id}/sessions`
-- **الجسم (Body)**:
-```json
-{
-    "curriculum_day_id": "...",
-    "metadata": { "device": "iPad Pro" }
-}
-```
+### 5. بدء محاولة (Start Attempt)
+- **المسار**: `POST /api/v1/app/games/{game_id}/attempts`
+- **لا يُكتب شيء في القاعدة عند البدء.** يرجّع الخادم رمزًا مختومًا يحمل لحظة البدء بساعة الخادم، ويُقيَّم به عند الإكمال.
+- **الجسم (Body)** — اختياري: `curriculum_day_id` اليوم الذي يعرضه التطبيق (يُقبل فقط إذا كان يوم الطفل الحالي ويحتوي اللعبة، وإلا تُسجَّل المحاولة كلعب حر).
 - **الاستجابة (201 Created)**:
 ```json
 {
     "success": true,
     "data": {
-        "id": "...",
-        "status": "STARTED",
-        "started_at": "2026-08-17T..."
+        "attempt_token": "eyJpdiI6...",
+        "started_at": "2026-08-27T13:00:00.000000Z",
+        "expires_at": "2026-08-27T13:11:00.000000Z",
+        "expires_in_seconds": 660,
+        "curriculum_day_id": "...",
+        "game": { "id": "...", "code": "ATT-001", "name": "صيد النجوم اللامعة", "required_seconds": 60, "required_score": 8, "min_counted_seconds": 15 },
+        "progress": { "status": "NOT_STARTED", "status_label": "لم تبدأ", "score": null, "required_score": 8, "attempts": 0, "failed_attempts": 0, "short_attempts": 0, "can_skip": false, "best_seconds": 0, "required_seconds": 60 }
     }
 }
 ```
 
-### 6. إنهاء جلسة اللعب وإرسال القياسات (Complete Game Session)
-- **المسار**: `POST /api/v1/app/sessions/{session_id}/complete`
+### 6. إكمال المحاولة (Complete Attempt)
+- **المسار**: `POST /api/v1/app/games/{game_id}/attempts/complete`
 - **الجسم (Body)**:
 ```json
 {
-    "attempts": 10,
-    "correct_attempts": 9,
-    "incorrect_attempts": 1,
-    "duration_seconds": 45,
-    "score": 90,
-    "metadata": { "eye_tracking_events": 12 }
+    "attempt_token": "eyJpdiI6...",
+    "duration_seconds": 49
 }
 ```
+- **كيف تُحسب الدرجة (على الخادم فقط)**: الثواني المعتمدة = الأصغر من (ما ادّعاه التطبيق، الوقت الفعلي منذ إصدار الرمز، الوقت منذ آخر نتيجة للطفل، مدة اللعبة). الدرجة = `floor(المعتمدة ÷ المطلوبة × 10)`، والنجاح = الدرجة ≥ `round(معيار اللعبة × 10)`. محاولة أقصر من `min_counted_seconds` تُسجَّل لكنها لا تُعدّ محاولة حقيقية (لا تُحسب فاشلة ولا تفتح التخطّي ولا يمكن أن تنجح).
 - **الاستجابة (200 OK)**:
 ```json
 {
     "success": true,
-    "message": "تم إنهاء الجلسة واحتساب النتيجة بنجاح",
+    "message": "أحسنت! اجتزت اللعبة",
     "data": {
-        "id": "...",
-        "attempts": 10,
-        "correct_attempts": 9,
-        "accuracy": 90.0,
-        "score": 90,
-        "status": "COMPLETED"
+        "attempt": {
+            "game_id": "...", "curriculum_day_id": "...",
+            "started_at": "...", "completed_at": "...",
+            "claimed_seconds": 49, "elapsed_seconds": 49, "effective_seconds": 49, "required_seconds": 60,
+            "score": 8, "required_score": 8, "is_passed": true, "is_counted": true, "is_replayed": false
+        },
+        "game": { "status": "PASSED", "status_label": "ناجحة", "score": 8, "required_score": 8, "attempts": 1, "failed_attempts": 0, "short_attempts": 0, "can_skip": false, "best_seconds": 49, "required_seconds": 60 }
     }
 }
 ```
+- **إعادة الإرسال**: إرسال نفس الرمز مرة ثانية (انقطاع الشبكة) يُرجع نفس النتيجة مع `is_replayed: true` دون احتساب جديد.
+- **أخطاء**: `INVALID_ATTEMPT_TOKEN` (422) رمز تالف أو لطفل/لعبة أخرى · `ATTEMPT_EXPIRED` (410) تجاوز مدة اللعبة + المهلة · `ATTEMPT_ALREADY_USED` (409) رمز أقدم من آخر نتيجة مُحتسبة · `ATTEMPT_LIMIT_REACHED` (429) تجاوز الحد اليومي للعبة · `GAME_NOT_PUBLISHED` (403).
+
+### 6-ب. تخطّي لعبة (Skip Game)
+- **المسار**: `POST /api/v1/app/games/{game_id}/skip` — يُقبل بعد 3 محاولات حقيقية فاشلة في اليوم نفسه (`attempts_before_unlock`)، ويُسجَّل كقرار (`SKIPPED`) يفتح اللعبة التالية دون أن يُحسب إنجازًا. تكراره في اليوم نفسه يُرجع نفس التسجيل.
+- **الاستجابة (200 OK)**: `{ "game_id", "skipped_at", "failed_attempts", "best_score", "game": { ...progress } }` · خطأ `GAME_SKIP_NOT_ALLOWED` (422).
 
 ### 7. تقارير التقدم (Progress Reports)
+- `GET /api/v1/app/progress` — الملخّص الإجمالي من لوحة (طفل × لعبة).
+- `GET /api/v1/app/progress/daily` و `.../monthly` — مجاميع الصفوف اليومية (طفل × يوم × لعبة) للفترة.
+- `GET /api/v1/app/progress/weekly?week=YYYY-MM-DD` — **التقرير الأسبوعي** (السبت → الجمعة بتوقيت بغداد؛ `week` أي تاريخ داخل الأسبوع المطلوب، الافتراضي الأسبوع الحالي): `week`, `previous_week`, `summary`, `previous_summary`, `delta`, `days[7]`, `games[]` (لكل لعبة: أيام اللعب، المحاولات/الفاشلة/القصيرة، أفضل درجة، متوسط أفضل‑اليوم، الانتباه، أيام النجاح/التخطّي، `per_day[7]`، `previous`، `delta`)، و`axes[]`/`skills[]`.
+- للمشرف: `GET /api/v1/admin/subscribers/{id}/weekly?week=YYYY-MM-DD` بنفس الشكل.
 - `GET /api/v1/app/progress` (الإجمالي مع تفصيل المحاور والمهارات)
 - `GET /api/v1/app/progress/daily` (تقرير اليوم)
 - `GET /api/v1/app/progress/weekly` (تقرير الأسبوع)

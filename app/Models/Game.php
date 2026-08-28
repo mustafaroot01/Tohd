@@ -106,9 +106,4 @@ class Game extends Model
     {
         return $this->hasMany(CurriculumDayGame::class);
     }
-
-    public function sessions(): HasMany
-    {
-        return $this->hasMany(GameSession::class);
-    }
 }

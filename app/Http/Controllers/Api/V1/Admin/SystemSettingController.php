@@ -2,10 +2,11 @@
 
 namespace App\Http\Controllers\Api\V1\Admin;
 
-use App\Contracts\SmsGatewayInterface;
+use App\Enums\OtpPurpose;
 use App\Http\Controllers\Controller;
 use App\Models\SystemSetting;
 use App\Rules\PhoneNumberRule;
+use App\Services\OtpService;
 use App\Support\ApiResponse;
 use App\Support\PhoneNumber;
 use Illuminate\Http\JsonResponse;
@@ -19,10 +20,8 @@ class SystemSettingController extends Controller
      */
     public function index(): JsonResponse
     {
-        $settings = SystemSetting::get();
-
         return ApiResponse::success(
-            data: $settings,
+            data: SystemSetting::get(),
             message: 'تم استرجاع إعدادات النظام بنجاح'
         );
     }
@@ -39,27 +38,25 @@ class SystemSettingController extends Controller
             'app_logo_file' => ['nullable', 'image', 'max:2048'], // Max 2MB image
             'is_maintenance' => ['required', 'boolean'],
             'otp_enabled' => ['required', 'boolean'],
-            'otp_expiry_minutes' => ['required', 'integer', 'min:1', 'max:60'],
+            'otp_base_url' => ['nullable', 'url', 'max:255'],
             'otp_api_key' => ['nullable', 'string', 'max:255'],
+            'profile_completion_enabled' => ['required', 'boolean'],
         ]);
 
-        // Process App Logo upload if present
         if ($request->hasFile('app_logo_file')) {
-            // Delete old logo file if exists
             if ($settings->app_logo) {
                 Storage::disk('public')->delete($settings->app_logo);
             }
 
-            // Store new logo
-            $path = $request->file('app_logo_file')->store('settings', 'public');
-            $settings->app_logo = $path;
+            $settings->app_logo = $request->file('app_logo_file')->store('settings', 'public');
         }
 
         $settings->fill([
             'app_name' => $validated['app_name'],
             'is_maintenance' => $validated['is_maintenance'],
             'otp_enabled' => $validated['otp_enabled'],
-            'otp_expiry_minutes' => $validated['otp_expiry_minutes'],
+            'otp_base_url' => $validated['otp_base_url'] ?? $settings->otp_base_url,
+            'profile_completion_enabled' => $validated['profile_completion_enabled'],
         ]);
 
         // The raw key is never sent back to the client, so the form field is
@@ -70,6 +67,8 @@ class SystemSettingController extends Controller
         }
 
         $settings->save();
+
+        SystemSetting::forgetCached();
 
         return ApiResponse::success(
             data: $settings->fresh(),
@@ -96,23 +95,19 @@ class SystemSettingController extends Controller
     }
 
     /**
-     * Send a real test SMS through the currently saved OTPIQ credentials, so
-     * the admin can confirm the API key works without going through the full
-     * registration/OTP flow.
+     * Send a real code through the saved Arqam credentials, so the admin can
+     * confirm the key works without going through a registration.
      */
-    public function testSms(Request $request, SmsGatewayInterface $gateway): JsonResponse
+    public function testSms(Request $request, OtpService $otp): JsonResponse
     {
         $validated = $request->validate([
             'phone' => ['required', 'string', new PhoneNumberRule],
         ]);
 
-        $phone = PhoneNumber::normalize($validated['phone']);
-        $testCode = (string) random_int(100000, 999999);
-
-        $gateway->send($phone, $testCode);
+        $otp->send(PhoneNumber::normalize($validated['phone']), OtpPurpose::REGISTER);
 
         return ApiResponse::success(
-            message: 'تم إرسال رسالة اختبار بنجاح، تحقق من وصولها إلى الرقم المُدخل'
+            message: 'تم إرسال رمز اختبار عبر واتساب، تحقق من وصوله إلى الرقم المُدخل'
         );
     }
 }

@@ -174,7 +174,7 @@ const deleteAsset = async () => {
       <template #item.name="{ item }">
         <div class="d-flex align-center gap-3">
           <VAvatar :color="statusColor(ASSET_TYPE, item.type)" variant="tonal" rounded size="38">
-            <VIcon :icon="item.type === 'LOTTIE' ? 'tabler-animation' : 'tabler-photo'" size="20" />
+            <VIcon :icon="item.type === 'LOTTIE' ? 'tabler-animation' : item.type === 'VIDEO' ? 'tabler-video' : item.type === 'AUDIO' ? 'tabler-volume' : 'tabler-photo'" size="20" />
           </VAvatar>
           <div>
             <div class="font-weight-bold text-high-emphasis">

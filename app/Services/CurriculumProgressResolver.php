@@ -2,10 +2,8 @@
 
 namespace App\Services;
 
-use App\Enums\GameSessionStatus;
 use App\Exceptions\NoActiveCurriculumException;
 use App\Models\CurriculumDay;
-use App\Models\GameSession;
 use App\Models\Subscriber;
 use App\Models\UserCurriculumAssignment;
 use Carbon\Carbon;
@@ -13,6 +11,23 @@ use Illuminate\Support\Collection;
 
 class CurriculumProgressResolver
 {
+    public function __construct(
+        protected ScoringService $scoring,
+        protected ProgressBoardService $board,
+    ) {}
+
+    /**
+     * Which day of the plan a child is on: days elapsed since the assignment
+     * started, wrapping around when the plan is shorter than the subscription.
+     */
+    public static function dayIndex(UserCurriculumAssignment $assignment, int $dayCount, ?Carbon $now = null): int
+    {
+        $now ??= now();
+        $daysElapsed = (int) max(1, $assignment->starts_at->copy()->startOfDay()->diffInDays($now->copy()->startOfDay()) + 1);
+
+        return ($daysElapsed - 1) % max(1, $dayCount);
+    }
+
     /**
      * Resolve the current training context and active day for a user.
      *
@@ -40,8 +55,7 @@ class CurriculumProgressResolver
         $now = $asOfDate ?: now();
         $startsAt = $assignment->starts_at;
 
-        // Calculate days elapsed (1-indexed)
-        $daysElapsed = (int) max(1, $startsAt->startOfDay()->diffInDays($now->startOfDay()) + 1);
+        $daysElapsed = (int) max(1, $startsAt->copy()->startOfDay()->diffInDays($now->copy()->startOfDay()) + 1);
 
         // Fetch all days in sequence
         $allDays = CurriculumDay::whereHas('week.month', function ($q) use ($curriculum) {
@@ -56,16 +70,19 @@ class CurriculumProgressResolver
             throw new NoActiveCurriculumException('المنهج التدريبي لا يحتوي على أيام مبرمجة.');
         }
 
-        // Loop through all days or modulo if duration exceeds available days
-        $dayIndex = ($daysElapsed - 1) % $allDays->count();
-        $currentDay = $allDays[$dayIndex];
+        $currentDay = $allDays[self::dayIndex($assignment, $allDays->count(), $now)];
 
-        // Fetch completed games for this day
-        $completedGameIds = GameSession::where('subscriber_id', $user->id)
-            ->where('curriculum_day_id', $currentDay->id)
-            ->where('status', GameSessionStatus::COMPLETED)
+        // The games that count as done today, judged exactly as the plan
+        // judges them (ScoringService): with the pass gate on only a game
+        // passed TODAY counts — an old pass, or a completed-but-failed try, does
+        // not, otherwise a child could close the day without reaching the bar.
+        $gameIds = $currentDay->dayGames->pluck('game_id')->filter()->values();
+        $rows = $this->board->rowsFor($user, $gameIds);
+        $completedGameIds = $currentDay->dayGames
+            ->filter(fn ($dg) => $dg->game && $this->scoring->countsAsDone($this->scoring->progressFor($dg->game, $rows->get($dg->game_id))))
             ->pluck('game_id')
-            ->unique();
+            ->unique()
+            ->values();
 
         $requiredGameIds = $currentDay->dayGames
             ->where('is_required', true)

@@ -2,59 +2,99 @@
 
 namespace App\Actions\Auth;
 
-use App\Actions\Otp\VerifyOtpAction;
 use App\Enums\OtpPurpose;
 use App\Enums\SubscriberActivityType;
-use App\Enums\SubscriberStatus;
-use App\Exceptions\DomainException;
+use App\Events\SubscriberRegistered;
 use App\Models\Subscriber;
+use App\Services\OtpService;
 use App\Services\SubscriberActivityLogger;
 use App\Support\PhoneNumber;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
+/**
+ * The code proved the phone, so the account is created — active from birth —
+ * and the parent is signed straight in. There is no "verify an existing
+ * account" path: an account exists only once its phone has been proven.
+ *
+ * Two guards stand before the account is made: the caller must hold the
+ * signup token handed out by register (so only whoever started this signup can
+ * finish it), and the phone must still be free at this exact moment (ten
+ * minutes is long enough for an admin to have created it meanwhile).
+ */
 class VerifyPhoneAction
 {
     public function __construct(
-        protected VerifyOtpAction $verifyOtp,
-        protected SubscriberActivityLogger $activityLogger
+        protected OtpService $otp,
+        protected SubscriberActivityLogger $activityLogger,
     ) {}
 
     /**
-     * Verify a subscriber's phone via OTP, activate the account, and issue a Sanctum token.
-     *
      * @return array{user: Subscriber, token: string}
-     *
-     * @throws DomainException
      */
-    public function execute(string $phone, string $code): array
+    public function execute(string $phone, string $code, ?string $signupToken = null): array
     {
-        $normalizedPhone = PhoneNumber::normalize($phone);
+        $phone = PhoneNumber::normalize($phone);
 
-        $subscriber = Subscriber::where('phone', $normalizedPhone)->first();
+        $signup = Cache::get(RegisterSubscriberAction::signupKey($phone));
 
-        if (! $subscriber) {
-            throw new DomainException('رقم الهاتف غير مسجل في النظام', 'PHONE_NOT_FOUND', 404);
+        // one message for "no signup" and "not your signup": a stranger must
+        // not learn whether a registration for this number is under way
+        if (! $signup || ! $this->tokenMatches($signup, $signupToken)) {
+            throw ValidationException::withMessages([
+                'phone' => 'انتهت جلسة التسجيل، أعد إدخال بياناتك',
+            ]);
         }
 
-        if ($subscriber->isSuspended()) {
-            throw new DomainException('تم إيقاف هذا الحساب، يرجى مراجعة الإدارة', 'ACCOUNT_SUSPENDED', 403);
-        }
+        $this->otp->verify($phone, OtpPurpose::REGISTER, $code);
 
-        $this->verifyOtp->execute($subscriber, $normalizedPhone, $code, OtpPurpose::PHONE_VERIFICATION);
+        $alreadyRegistered = function () use ($phone) {
+            Cache::forget(RegisterSubscriberAction::signupKey($phone));
 
-        $subscriber->update([
-            'phone_verified_at' => now(),
-            'status' => SubscriberStatus::ACTIVE,
-            'last_login_at' => now(),
-            'last_activity_at' => now(),
-        ]);
+            throw ValidationException::withMessages([
+                'phone' => 'رقم الهاتف مسجّل بالفعل، سجّل الدخول أو استعد كلمة المرور',
+            ]);
+        };
 
-        $this->activityLogger->log($subscriber, SubscriberActivityType::ACCOUNT_ACTIVATED);
+        $subscriber = DB::transaction(function () use ($signup, $phone, $alreadyRegistered) {
+            if (Subscriber::where('phone', $phone)->exists()) {
+                $alreadyRegistered();
+            }
 
-        $token = $subscriber->createToken('mobile_app')->plainTextToken;
+            try {
+                $subscriber = RegisterSubscriberAction::createFromSignup($signup);
+            } catch (UniqueConstraintViolationException) {
+                // two confirms in flight at once: the unique index is the real
+                // gate, and the loser must read the same message, not a 500
+                $alreadyRegistered();
+            }
+
+            $this->activityLogger->log($subscriber, SubscriberActivityType::REGISTERED);
+            $this->activityLogger->log($subscriber, SubscriberActivityType::ACCOUNT_ACTIVATED);
+
+            return $subscriber;
+        });
+
+        Cache::forget(RegisterSubscriberAction::signupKey($phone));
+
+        event(new SubscriberRegistered($subscriber));
 
         return [
             'user' => $subscriber,
-            'token' => $token,
+            'token' => $subscriber->createToken('mobile_app')->plainTextToken,
         ];
+    }
+
+    private function tokenMatches(array $signup, ?string $signupToken): bool
+    {
+        $expected = $signup['token'] ?? null;
+
+        if (! is_string($expected) || ! is_string($signupToken) || $signupToken === '') {
+            return false;
+        }
+
+        return hash_equals($expected, hash('sha256', $signupToken));
     }
 }

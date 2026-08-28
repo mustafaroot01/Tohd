@@ -2,31 +2,36 @@
 
 namespace App\Http\Controllers\Api\V1\App;
 
-use App\Actions\Otp\SendOtpAction;
-use App\Enums\OtpPurpose;
-use App\Enums\SubscriberActivityType;
-use App\Enums\SubscriberStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\App\SaveProfileDetailsRequest;
 use App\Http\Requests\Api\V1\App\UpdateProfileRequest;
+use App\Http\Resources\Api\V1\SubscriberProfileResource;
 use App\Http\Resources\Api\V1\SubscriberResource;
-use App\Services\SubscriberActivityLogger;
+use App\Models\SubscriberProfile;
+use App\Services\ProfileCompletionService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
-use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Symfony\Component\HttpFoundation\Response;
 
 class ProfileController extends Controller
 {
+    public function __construct(private readonly ProfileCompletionService $completion) {}
+
     public function show(Request $request): JsonResponse
     {
         return ApiResponse::success(
-            data: new SubscriberResource($request->user()),
+            data: $this->payload($request->user()),
             message: 'تم استرجاع الملف الشخصي بنجاح'
         );
     }
 
-    public function update(UpdateProfileRequest $request, SendOtpAction $sendOtp, SubscriberActivityLogger $activityLogger): JsonResponse
+    /**
+     * Name, address and password. The phone is not editable here — see
+     * UpdateProfileRequest.
+     */
+    public function update(UpdateProfileRequest $request): JsonResponse
     {
         $user = $request->user();
         $data = $request->validated();
@@ -46,25 +51,51 @@ class ProfileController extends Controller
             $data['password'] = Hash::make($data['password']);
         }
 
-        $phoneChanged = isset($data['phone']) && $data['phone'] !== $user->phone;
-
-        if ($phoneChanged) {
-            $data['phone_verified_at'] = null;
-            $data['status'] = SubscriberStatus::UNVERIFIED;
-        }
-
         $user->update($data);
 
-        if ($phoneChanged) {
-            $activityLogger->log($user, SubscriberActivityType::PHONE_CHANGED, ['new_phone' => $user->phone]);
-            $sendOtp->execute($user, $user->phone, OtpPurpose::PHONE_VERIFICATION);
-        }
+        return ApiResponse::success(
+            data: $this->payload($user->fresh()),
+            message: 'تم تحديث الملف الشخصي بنجاح'
+        );
+    }
+
+    /**
+     * The second registration step. Reachable only while the feature is
+     * switched on (RequiresProfileCompletion), and idempotent — the parent may
+     * come back and correct an answer.
+     */
+    public function saveDetails(SaveProfileDetailsRequest $request): JsonResponse
+    {
+        $user = $request->user();
+
+        SubscriberProfile::updateOrCreate(
+            ['subscriber_id' => $user->id],
+            $request->validated() + ['completed_at' => now()]
+        );
 
         return ApiResponse::success(
-            data: new SubscriberResource($user->fresh()),
-            message: $phoneChanged
-                ? 'تم تحديث الملف الشخصي، يرجى التحقق من رقم الهاتف الجديد عبر رمز التحقق المُرسَل'
-                : 'تم تحديث الملف الشخصي بنجاح'
+            data: $this->payload($user->fresh()),
+            message: 'تم حفظ البيانات بنجاح'
         );
+    }
+
+    /**
+     * The profile as the app reads it. The completion block appears only while
+     * the feature is on — with it off, no response mentions it at all.
+     */
+    private function payload($user): array
+    {
+        $data = (new SubscriberResource($user))->resolve();
+
+        if (! $this->completion->isEnabled()) {
+            return $data;
+        }
+
+        $profile = $user->profile()->with('governorate')->first();
+
+        return $data + [
+            'details' => $profile ? (new SubscriberProfileResource($profile))->resolve() : null,
+            'profile_completion' => $this->completion->status($user),
+        ];
     }
 }

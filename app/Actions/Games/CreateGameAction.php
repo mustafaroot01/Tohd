@@ -3,6 +3,7 @@
 namespace App\Actions\Games;
 
 use App\Enums\GameStatus;
+use App\Enums\GameType;
 use App\Models\Game;
 use App\Models\User;
 use App\Services\AuditLogService;
@@ -23,7 +24,8 @@ class CreateGameAction
     public function execute(array $data, ?User $creator = null): Game
     {
         return DB::transaction(function () use ($data, $creator) {
-            $config = $this->configBuilder->build($data['type'], $data['config'] ?? []);
+            $type = $data['type'] ?? GameType::TAP->value;
+            $config = $this->configBuilder->build($type, $data['config'] ?? []);
 
             $levelModel = \App\Models\Level::find($data['level_id']);
 
@@ -32,7 +34,7 @@ class CreateGameAction
                 'name' => $data['name'],
                 'slug' => $data['slug'] ?? Str::slug($data['name']).'-'.Str::random(4),
                 'description' => $data['description'] ?? null,
-                'type' => $data['type'],
+                'type' => $type,
                 'axis_id' => $data['axis_id'],
                 'skill_id' => $data['skill_id'],
                 'level_id' => $data['level_id'],

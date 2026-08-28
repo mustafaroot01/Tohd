@@ -54,25 +54,37 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('user_skill_progress', function (Blueprint $table) {
-            $table->dropForeign(['subscriber_id']);
-        });
-        Schema::table('user_skill_progress', function (Blueprint $table) {
-            $table->renameColumn('subscriber_id', 'user_id');
-        });
-        Schema::table('user_skill_progress', function (Blueprint $table) {
-            $table->foreign('user_id')->references('id')->on('users')->cascadeOnDelete();
-        });
+        if (Schema::hasTable('user_skill_progress')) {
+            Schema::table('user_skill_progress', function (Blueprint $table) {
+                $table->dropForeign(['subscriber_id']);
+            });
+        }
+        if (Schema::hasTable('user_skill_progress')) {
+            Schema::table('user_skill_progress', function (Blueprint $table) {
+                $table->renameColumn('subscriber_id', 'user_id');
+            });
+        }
+        if (Schema::hasTable('user_skill_progress')) {
+            Schema::table('user_skill_progress', function (Blueprint $table) {
+                $table->foreign('user_id')->references('id')->on('users')->cascadeOnDelete();
+            });
+        }
 
-        Schema::table('game_sessions', function (Blueprint $table) {
-            $table->dropForeign(['subscriber_id']);
-        });
-        Schema::table('game_sessions', function (Blueprint $table) {
-            $table->renameColumn('subscriber_id', 'user_id');
-        });
-        Schema::table('game_sessions', function (Blueprint $table) {
-            $table->foreign('user_id')->references('id')->on('users')->cascadeOnDelete();
-        });
+        if (Schema::hasTable('game_sessions')) {
+            Schema::table('game_sessions', function (Blueprint $table) {
+                $table->dropForeign(['subscriber_id']);
+            });
+        }
+        if (Schema::hasTable('game_sessions')) {
+            Schema::table('game_sessions', function (Blueprint $table) {
+                $table->renameColumn('subscriber_id', 'user_id');
+            });
+        }
+        if (Schema::hasTable('game_sessions')) {
+            Schema::table('game_sessions', function (Blueprint $table) {
+                $table->foreign('user_id')->references('id')->on('users')->cascadeOnDelete();
+            });
+        }
 
         Schema::table('user_curriculum_assignments', function (Blueprint $table) {
             $table->dropForeign(['subscriber_id']);

@@ -16,8 +16,10 @@ use App\Http\Resources\Api\V1\SubscriberResource;
 use App\Models\Subscriber;
 use App\Models\UserCurriculumAssignment;
 use App\Services\ProgressCalculationService;
+use App\Services\WeeklyReportService;
 use App\Support\ApiResponse;
 use App\Support\TableQuery;
+use App\Support\WeekWindow;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -42,23 +44,37 @@ class SubscriberController extends Controller
         );
     }
 
-    public function show(Subscriber $subscriber, ProgressCalculationService $progressService): JsonResponse
+    public function show(Subscriber $subscriber, ProgressCalculationService $progressService, WeeklyReportService $weekly): JsonResponse
     {
         $subscriber->load([
             'activeCurriculumAssignment.curriculum',
             'activeCurriculumAssignment.activation.product',
             'curriculumAssignments' => fn ($q) => $q->with(['curriculum', 'activation.product'])->orderByDesc('starts_at'),
             'activations' => fn ($q) => $q->with('product.curriculum')->orderByDesc('activated_at'),
-            'gameSessions' => fn ($q) => $q->with(['game'])->latest('started_at'),
             'activities' => fn ($q) => $q->limit(100),
+            'profile.governorate',
         ]);
 
         return ApiResponse::success(
             data: new SubscriberDetailResource([
                 'subscriber' => $subscriber,
                 'progress' => $progressService->getOverallProgress($subscriber),
+                'weekly' => $weekly->build($subscriber, WeekWindow::containing()),
             ]),
             message: 'تم استرجاع بيانات المشترك بنجاح'
+        );
+    }
+
+    /** The weekly evaluation for any week: `?week=YYYY-MM-DD` inside the week wanted. */
+    public function weekly(Request $request, Subscriber $subscriber, WeeklyReportService $weekly): JsonResponse
+    {
+        $validated = $request->validate([
+            'week' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:today'],
+        ]);
+
+        return ApiResponse::success(
+            data: $weekly->build($subscriber, WeekWindow::containing($validated['week'] ?? null)),
+            message: 'تم استرجاع التقرير الأسبوعي بنجاح'
         );
     }
 

@@ -19,7 +19,6 @@ class SystemSettingSeeder extends Seeder
                 'app_logo' => null,
                 'is_maintenance' => false,
                 'otp_enabled' => true,
-                'otp_expiry_minutes' => 5,
             ]
         );
     }

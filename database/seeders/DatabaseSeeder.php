@@ -15,6 +15,7 @@ class DatabaseSeeder extends Seeder
             SystemSettingSeeder::class,
             AdminUserSeeder::class,
             DemoSubscriberSeeder::class,
+            GovernorateSeeder::class,
             AxisSeeder::class,
             SkillSeeder::class,
             DemoGameSeeder::class,

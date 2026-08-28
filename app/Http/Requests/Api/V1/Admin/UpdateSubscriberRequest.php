@@ -7,7 +7,6 @@ use App\Http\Requests\Concerns\NormalizesPhone;
 use App\Rules\PhoneNumberRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Enum;
 
 class UpdateSubscriberRequest extends FormRequest
 {
@@ -27,7 +26,7 @@ class UpdateSubscriberRequest extends FormRequest
             'phone' => ['sometimes', 'required', 'string', new PhoneNumberRule, Rule::unique('subscribers', 'phone')->ignore($subscriberId)],
             'address' => ['sometimes', 'nullable', 'string', 'max:500'],
             'password' => ['nullable', 'string', 'min:8'],
-            'status' => ['sometimes', new Enum(SubscriberStatus::class)],
+            'status' => ['sometimes', Rule::in([SubscriberStatus::ACTIVE->value, SubscriberStatus::SUSPENDED->value])],
         ];
     }
 }

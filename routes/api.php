@@ -1,24 +1,26 @@
 <?php
 
 use App\Http\Controllers\Api\V1\Admin\ActivationCodeController;
+use App\Http\Controllers\Api\V1\Admin\AdminProfileController;
 use App\Http\Controllers\Api\V1\Admin\AssetController;
 use App\Http\Controllers\Api\V1\Admin\AxisController;
 use App\Http\Controllers\Api\V1\Admin\CurriculumController as AdminCurriculumController;
 use App\Http\Controllers\Api\V1\Admin\DashboardController;
+use App\Http\Controllers\Api\V1\Admin\GameAssetController;
 use App\Http\Controllers\Api\V1\Admin\GameController as AdminGameController;
+use App\Http\Controllers\Api\V1\Admin\GovernorateController;
+use App\Http\Controllers\Api\V1\Admin\LevelController;
 use App\Http\Controllers\Api\V1\Admin\ProductController;
 use App\Http\Controllers\Api\V1\Admin\SkillController;
 use App\Http\Controllers\Api\V1\Admin\SubscriberController;
-use App\Http\Controllers\Api\V1\Admin\UserController;
 use App\Http\Controllers\Api\V1\Admin\SystemSettingController;
-use App\Http\Controllers\Api\V1\Admin\AdminProfileController;
-use App\Http\Controllers\Api\V1\Admin\GameAssetController;
-use App\Http\Controllers\Api\V1\Admin\LevelController;
+use App\Http\Controllers\Api\V1\Admin\UserController;
 use App\Http\Controllers\Api\V1\App\ActivationController as AppActivationController;
+use App\Http\Controllers\Api\V1\App\AttemptController;
 use App\Http\Controllers\Api\V1\App\AuthController as AppAuthController;
 use App\Http\Controllers\Api\V1\App\CurriculumController as AppCurriculumController;
 use App\Http\Controllers\Api\V1\App\GameController as AppGameController;
-use App\Http\Controllers\Api\V1\App\GameSessionController;
+use App\Http\Controllers\Api\V1\App\GovernorateController as AppGovernorateController;
 use App\Http\Controllers\Api\V1\App\HomeController;
 use App\Http\Controllers\Api\V1\App\ProfileController;
 use App\Http\Controllers\Api\V1\App\ProgressController;
@@ -58,6 +60,7 @@ Route::prefix('v1')->middleware('force.json')->group(function () {
         Route::apiResource('axes', AxisController::class, ['parameters' => ['axes' => 'axis']]);
         Route::apiResource('skills', SkillController::class);
         Route::apiResource('levels', LevelController::class);
+        Route::apiResource('governorates', GovernorateController::class);
 
         // Assets / Lottie Management
         Route::get('assets', [AssetController::class, 'index']);
@@ -109,6 +112,7 @@ Route::prefix('v1')->middleware('force.json')->group(function () {
         Route::get('subscribers', [SubscriberController::class, 'index']);
         Route::post('subscribers', [SubscriberController::class, 'store']);
         Route::get('subscribers/{subscriber}', [SubscriberController::class, 'show']);
+        Route::get('subscribers/{subscriber}/weekly', [SubscriberController::class, 'weekly']);
         Route::put('subscribers/{subscriber}', [SubscriberController::class, 'update']);
         Route::post('subscribers/{subscriber}/suspend', [SubscriberController::class, 'suspend']);
         Route::post('subscribers/{subscriber}/reactivate', [SubscriberController::class, 'reactivate']);
@@ -129,12 +133,12 @@ Route::prefix('v1')->middleware('force.json')->group(function () {
     Route::prefix('app')->middleware('maintenance')->group(function () {
         // Subscriber Authentication
         Route::prefix('auth')->group(function () {
-            Route::post('register', [AppAuthController::class, 'register'])->middleware('throttle:15,1');
-            Route::post('otp/verify', [AppAuthController::class, 'verifyOtp'])->middleware('throttle:10,1');
-            Route::post('otp/resend', [AppAuthController::class, 'resendOtp'])->middleware('throttle:5,1');
+            Route::post('register', [AppAuthController::class, 'register'])->middleware('throttle:otp-send');
+            Route::post('otp/verify', [AppAuthController::class, 'verifyOtp'])->middleware('throttle:otp-verify');
+            Route::post('otp/resend', [AppAuthController::class, 'resendOtp'])->middleware('throttle:otp-send');
             Route::post('login', [AppAuthController::class, 'login'])->middleware('throttle:15,1');
-            Route::post('password/forgot', [AppAuthController::class, 'forgotPassword'])->middleware('throttle:5,1');
-            Route::post('password/reset', [AppAuthController::class, 'resetPassword'])->middleware('throttle:10,1');
+            Route::post('password/forgot', [AppAuthController::class, 'forgotPassword'])->middleware('throttle:otp-send-recovery');
+            Route::post('password/reset', [AppAuthController::class, 'resetPassword'])->middleware('throttle:otp-verify');
             Route::post('logout', [AppAuthController::class, 'logout'])->middleware(['auth:sanctum', 'subscriber']);
         });
     });
@@ -145,26 +149,37 @@ Route::prefix('v1')->middleware('force.json')->group(function () {
         Route::get('profile', [ProfileController::class, 'show']);
         Route::put('profile', [ProfileController::class, 'update']);
 
-        // Activation & Subscription
-        Route::get('activation', [AppActivationController::class, 'show']);
-        Route::post('activations/redeem', [AppActivationController::class, 'redeem'])->middleware('throttle:5,1');
+        // The second registration step. Both routes 404 while the feature is
+        // switched off, so nothing about it can be discovered from the API.
+        Route::middleware('profile.feature')->group(function () {
+            Route::get('governorates', [AppGovernorateController::class, 'index']);
+            Route::post('profile/details', [ProfileController::class, 'saveDetails']);
+        });
 
-        // Curriculum & Daily Training
-        Route::get('curriculum', [AppCurriculumController::class, 'show']);
-        Route::get('curriculum/today', [AppCurriculumController::class, 'today']);
+        // Everything below waits for that step whenever it is switched on.
+        Route::middleware('profile.complete')->group(function () {
+            // Activation & Subscription
+            Route::get('activation', [AppActivationController::class, 'show']);
+            Route::post('activations/redeem', [AppActivationController::class, 'redeem'])->middleware('throttle:5,1,redeem');
 
-        // Playable Games
-        Route::get('games/{game}', [AppGameController::class, 'show']);
+            // Curriculum & Daily Training
+            Route::get('curriculum', [AppCurriculumController::class, 'show']);
+            Route::get('curriculum/today', [AppCurriculumController::class, 'today']);
 
-        // Game Sessions Telemetry
-        Route::post('games/{game}/sessions', [GameSessionController::class, 'start'])->middleware('throttle:60,1');
-        Route::post('sessions/{session}/complete', [GameSessionController::class, 'complete'])->middleware('throttle:60,1');
-        Route::post('sessions/{session}/abandon', [GameSessionController::class, 'abandon']);
+            // Playable Games
+            Route::get('games/{game}', [AppGameController::class, 'show']);
 
-        // Performance Progress (Training Telemetry)
-        Route::get('progress', [ProgressController::class, 'index']);
-        Route::get('progress/daily', [ProgressController::class, 'daily']);
-        Route::get('progress/weekly', [ProgressController::class, 'weekly']);
-        Route::get('progress/monthly', [ProgressController::class, 'monthly']);
+            // Game Sessions Telemetry
+            // one attempt: start (no write) → complete (graded on the server's clock)
+            Route::post('games/{game}/attempts', [AttemptController::class, 'start'])->middleware('throttle:60,1,attempts');
+            Route::post('games/{game}/attempts/complete', [AttemptController::class, 'complete'])->middleware('throttle:60,1,attempts');
+            Route::post('games/{game}/skip', [AttemptController::class, 'skip'])->middleware('throttle:30,1,skip');
+
+            // Performance Progress (Training Telemetry)
+            Route::get('progress', [ProgressController::class, 'index']);
+            Route::get('progress/daily', [ProgressController::class, 'daily']);
+            Route::get('progress/weekly', [ProgressController::class, 'weekly']);
+            Route::get('progress/monthly', [ProgressController::class, 'monthly']);
+        });
     });
 });

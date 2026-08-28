@@ -22,7 +22,7 @@ class UpdateGameRequest extends FormRequest
             'name' => ['sometimes', 'required', 'string', 'max:255'],
             'slug' => ['sometimes', 'nullable', 'string', 'max:255', 'unique:games,slug,'.$gameId],
             'description' => ['nullable', 'string'],
-            'type' => ['sometimes', 'required', new Enum(GameType::class)],
+            'type' => ['sometimes', 'nullable', new Enum(GameType::class)],
             'axis_id' => ['sometimes', 'required', 'uuid', 'exists:axes,id'],
             'skill_id' => ['sometimes', 'required', 'uuid', 'exists:skills,id'],
             'level_id' => ['sometimes', 'required', 'uuid', 'exists:levels,id'],

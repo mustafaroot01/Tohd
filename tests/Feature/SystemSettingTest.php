@@ -2,9 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\Subscriber;
 use App\Models\SystemSetting;
 use App\Models\User;
-use App\Models\Subscriber;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -15,6 +15,7 @@ class SystemSettingTest extends TestCase
     use RefreshDatabase;
 
     protected User $admin;
+
     protected Subscriber $subscriber;
 
     protected function setUp(): void
@@ -52,7 +53,7 @@ class SystemSettingTest extends TestCase
                     'app_logo_url',
                     'is_maintenance',
                     'otp_enabled',
-                    'otp_expiry_minutes',
+                    'otp_base_url',
                     'otp_api_key_configured',
                     'otp_api_key_preview',
                 ],
@@ -81,8 +82,9 @@ class SystemSettingTest extends TestCase
                 'app_logo_file' => $logo,
                 'is_maintenance' => true,
                 'otp_enabled' => false,
-                'otp_expiry_minutes' => 10,
+                'otp_base_url' => 'https://otp.arqam.tech/api',
                 'otp_api_key' => 'sk_live_secret123',
+                'profile_completion_enabled' => true,
             ]);
 
         $response->assertStatus(200)
@@ -94,7 +96,7 @@ class SystemSettingTest extends TestCase
         $this->assertEquals('رحلة فارس الجديدة', $settings->app_name);
         $this->assertTrue($settings->is_maintenance);
         $this->assertFalse($settings->otp_enabled);
-        $this->assertEquals(10, $settings->otp_expiry_minutes);
+        $this->assertEquals('https://otp.arqam.tech/api', $settings->otp_base_url);
         $this->assertEquals('sk_live_secret123', $settings->getRawOriginal('otp_api_key'));
 
         // Verify Logo uploaded
@@ -111,8 +113,9 @@ class SystemSettingTest extends TestCase
                 'app_name' => 'رحلة فارس',
                 'is_maintenance' => false,
                 'otp_enabled' => true,
-                'otp_expiry_minutes' => 5,
+                'otp_base_url' => 'https://otp.arqam.tech/api',
                 'otp_api_key' => '',
+                'profile_completion_enabled' => false,
             ]);
 
         $response->assertStatus(200);
@@ -131,7 +134,7 @@ class SystemSettingTest extends TestCase
 
         $response->assertStatus(200);
 
-        $this->assertNotNull($this->fakeSmsGateway()->lastCodeFor('+9647701234567'));
+        $this->assertDatabaseHas('phone_verifications', ['phone' => '+9647701234567']);
     }
 
     public function test_test_sms_rejects_invalid_phone_number(): void

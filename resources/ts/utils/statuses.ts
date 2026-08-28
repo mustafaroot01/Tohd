@@ -65,6 +65,14 @@ export const ASSIGNMENT_STATUS: StatusMap = {
   CANCELLED: { label: 'ملغى', color: 'error' },
 }
 
+/** App\Enums\GameProgressStatus */
+export const GAME_PROGRESS_STATUS: StatusMap = {
+  NOT_STARTED: { label: 'لم تبدأ', color: 'secondary' },
+  IN_PROGRESS: { label: 'قيد المحاولة', color: 'info' },
+  PASSED: { label: 'ناجحة', color: 'success' },
+  SKIPPED: { label: 'تم تخطّيها', color: 'warning' },
+}
+
 /** App\Enums\AssetType */
 export const ASSET_TYPE: StatusMap = {
   LOTTIE: { label: 'رسوم Lottie المتحركة (JSON)', color: 'warning' },

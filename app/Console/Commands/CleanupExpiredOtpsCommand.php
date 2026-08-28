@@ -2,21 +2,22 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Otp;
+use App\Models\PhoneVerification;
 use Illuminate\Console\Command;
 
 class CleanupExpiredOtpsCommand extends Command
 {
-    protected $signature = 'app:cleanup-expired-otps {--days=30 : عمر السجلات بالأيام قبل الحذف}';
-    protected $description = 'حذف رموز OTP منتهية الصلاحية أو مُستهلكة الأقدم من عدد أيام معين';
+    protected $signature = 'app:cleanup-expired-otps {--days=1 : عمر السجلات بالأيام قبل الحذف}';
+
+    protected $description = 'حذف سجلات رموز التحقق المنتهية (phone_verifications)';
 
     public function handle(): int
     {
         $days = (int) $this->option('days');
 
-        $deleted = Otp::where('expires_at', '<', now()->subDays($days))->delete();
+        $deleted = PhoneVerification::where('expires_at', '<', now()->subDays($days))->delete();
 
-        $this->info("تم حذف ({$deleted}) رمز تحقق منتهي الصلاحية أقدم من {$days} يوماً.");
+        $this->info("تم حذف ({$deleted}) سجل تحقق منتهٍ أقدم من {$days} يوم.");
 
         return Command::SUCCESS;
     }
